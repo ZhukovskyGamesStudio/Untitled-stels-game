@@ -268,6 +268,7 @@ namespace Stealth.Player
                 m_Controller.enabled = false;
                 transform.position += Vector3.up * carry;
                 m_Controller.enabled = true;
+                Level.PassableForPlayers.Refresh(m_Controller);
                 if (m_Velocity.y < 0f) m_Velocity.y = -2f;
             }
             if (m_StepOffset < 0f) m_StepOffset = m_Controller.stepOffset;
@@ -344,7 +345,7 @@ namespace Stealth.Player
                 {
                     var from = middle + dir * (ahead * (cc.radius + 0.05f)) + side * s;
                     // (a ray that starts inside a wall does not see it: only what is over a free spot counts)
-                    if (Physics.Raycast(from, Vector3.up, out var hit, up, ~(1 << 2), QueryTriggerInteraction.Ignore)
+                    if (Level.PassableForPlayers.Raycast(from, Vector3.up, out var hit, up, ~(1 << 2))
                         && hit.normal.y < -0.5f && !hit.collider.transform.IsChildOf(cc.transform)) return LowStep;
                 }
             return step;
@@ -358,7 +359,7 @@ namespace Stealth.Player
         {
             const float lift = 0.1f;
             var origin = transform.position + Vector3.up * lift;
-            if (!Physics.Raycast(origin, Vector3.down, out var hit, GroundSnapDistance + lift, ~(1 << 2), QueryTriggerInteraction.Ignore))
+            if (!Level.PassableForPlayers.Raycast(origin, Vector3.down, out var hit, GroundSnapDistance + lift, ~(1 << 2)))
                 return false;
             if (Vector3.Angle(hit.normal, Vector3.up) > m_Controller.slopeLimit + 1f) return false;
             float drop = hit.distance - lift;
@@ -371,7 +372,7 @@ namespace Stealth.Player
         public int SnapCount { get; private set; }
 
         bool CanStandUp() =>
-            !Physics.SphereCast(transform.position + Vector3.up * 0.5f, m_Controller.radius * 0.9f, Vector3.up, out _,
-                PlayerController.StandHeight - 0.5f, ~(1 << 2), QueryTriggerInteraction.Ignore);
+            !Level.PassableForPlayers.SphereCast(transform.position + Vector3.up * 0.5f, m_Controller.radius * 0.9f, Vector3.up, out _,
+                PlayerController.StandHeight - 0.5f, ~(1 << 2));
     }
 }

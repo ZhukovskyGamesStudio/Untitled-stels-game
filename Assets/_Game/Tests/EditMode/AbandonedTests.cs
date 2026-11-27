@@ -38,14 +38,17 @@ namespace Stealth.Tests
             foreach (var l in Stations())
             {
                 string name = $"{l.Seed}/{l.LevelIndex}";
-                Assert.IsTrue(new[] { "pinwheel", "campus", "z", "stagger", "cross", "deep" }.Contains(l.Mass), $"{name}: {l.Mass}");
+                Assert.IsTrue(new[] { "spokes", "dumbbell" }.Contains(l.Mass), $"{name}: {l.Mass}");
+                Assert.AreEqual("hub", l.Scheme, name);
                 Assert.AreEqual(HouseKind.Abandoned, l.PlanKind, name);
                 Assert.That(l.Floors, Is.InRange(3, 4), name);
                 for (int f = 0; f < l.Floors; f++)
                 {
-                    var corridor = l.Rooms.Where(r => r.Floor == f && r.Type == RoomType.Corridor).OrderByDescending(r => r.Area).FirstOrDefault();
-                    Assert.IsNotNull(corridor, $"{name}: a corridor on floor {f}");
-                    Assert.Greater(Mathf.Min(corridor.Bounds.width, corridor.Bounds.height), 8f, $"{name}: the corridors turn on floor {f}");
+                    // spokes out of the middle more ways than one: together the corridors span the floor both ways
+                    var corridors = l.Rooms.Where(r => r.Floor == f && r.Type == RoomType.Corridor).ToList();
+                    Assert.IsNotEmpty(corridors, $"{name}: a corridor on floor {f}");
+                    float across = corridors.Max(r => r.Bounds.xMax) - corridors.Min(r => r.Bounds.xMin), along = corridors.Max(r => r.Bounds.yMax) - corridors.Min(r => r.Bounds.yMin);
+                    Assert.Greater(Mathf.Min(across, along), 12f, $"{name}: the spokes run both ways on floor {f}");
                 }
                 Assert.Greater(l.Rooms.Count(r => r.Type == RoomType.Lab), 1, $"{name}: labs");
                 Assert.Greater(l.Rooms.Count(r => r.Type == RoomType.Server), 0, $"{name}: servers");

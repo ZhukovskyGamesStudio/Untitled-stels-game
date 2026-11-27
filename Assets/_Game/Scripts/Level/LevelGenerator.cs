@@ -144,6 +144,10 @@ namespace Stealth.Level
         public float LinkedCorridorShare = 0.6f;
         [Tooltip("In a linked house: corridor length, metres (min, max).")]
         public Vector2Int LinkCorridorLength = new(3, 9);
+        [Tooltip("Share of the office houses laid out blocks first (PlanGenerator.Blocks): corridors that turn and cross between blocks of rooms, open plans with closed pods, departments off a private hall, rows of offices. The rest keep the wings with a spine down each (and a linked house is always its own kind).")]
+        [Range(0f, 1f)] public float BlocksChance = 1f;
+        [Tooltip("How an office of blocks is laid out. The kind of house sets it (HouseKinds.Apply): every kind has a plan of its own, not one plan with other numbers. Racetrack — a ring corridor a room's depth from the facade, a core inside it (the office). Court — an atrium in the middle, a gallery round it, suites behind (the business centre). Grid — halls as islands in a grid of aisles (the data centre). Sheds — a strip of rooms along the front, one corridor behind it, big halls that open into each other (the warehouse). Axis — a straight gallery on the lobby's axis, the plan mirrored either side of it (the headquarters).")]
+        public OfficeLayout Layout;
         [Tooltip("Every room type at least once in every house (the rooms test).")]
         public bool EveryRoomType;
         [Tooltip("Floor area the corridors take on top of the rooms (0.2 = a fifth more): corridors are never rooms, " +
@@ -465,6 +469,7 @@ namespace Stealth.Level
                     Plan = o.Plan,
                     LobbyRoom = o.Lobby,
                     Mass = o.Mass,
+                    Scheme = o.Scheme,
                     Kind = h.Kind,
                     OwnPlan = building.Garage || building.Hospital || building.Apartments || building.Station,
                     PlanAttempt = attempt,
@@ -947,6 +952,9 @@ namespace Stealth.Level
         /// </summary>
         public const float HatchClear = 7.5f, HatchUnwatched = 9f;
 
+        /// <summary>A second map terminal stands at least this far from every other terminal, metres (else the house has one).</summary>
+        public const float MapTerminalSpread = 6f;
+
         /// <summary>A random free point of a room near its middle (on its floor, not on a staircase).</summary>
         static Vector3 SpotIn(LevelLayout l, PlanRoom r, System.Random rng, float spread)
         {
@@ -1099,6 +1107,8 @@ namespace Stealth.Level
                         foreach (var t in l.Terminals) near = Mathf.Min(near, (l.Props[d].Position - l.Props[t.prop].Position).sqrMagnitude);
                         if (near > best) { best = near; pick = d; }
                     }
+                    // a house too small to spread two map terminals has one (the second stood at the next desk)
+                    if (kind == TerminalKind.Map && best < MapTerminalSpread * MapTerminalSpread && l.Terminals.Exists(t => t.kind == TerminalKind.Map)) continue;
                 }
                 pool.Remove(pick);
                 var p = l.Props[pick];

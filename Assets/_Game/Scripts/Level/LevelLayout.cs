@@ -202,6 +202,8 @@ namespace Stealth.Level
         public HousePlan Plan;
         /// <summary>What the mass of the building is (bar, L, T, U, courtyard, H): for logs and the route panel.</summary>
         public string Mass = "";
+        /// <summary>How the house is laid out, by name (PlanGenerator.Output.Scheme): each kind of house has its own.</summary>
+        public string Scheme = "";
         /// <summary>Which variant of the plan was taken (0 = the first; more when earlier ones failed the walk check).</summary>
         public int PlanAttempt;
         /// <summary>What kind of building this is (an office of some character, the hospital, the repair shop, the flats): its name, its feature.</summary>

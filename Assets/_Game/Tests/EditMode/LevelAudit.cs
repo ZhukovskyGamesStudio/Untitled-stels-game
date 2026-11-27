@@ -69,7 +69,8 @@ namespace Stealth.Tests
                 Add("18 renderers in it", ActiveLevel.Root.GetComponentsInChildren<Renderer>().Length);
                 ActiveLevel.Clear();
                 UnityEngine.AI.NavMesh.RemoveAllNavMeshData();
-                sb.AppendLine($"=== {kind}: {all.Count} houses, masses: {string.Join(", ", masses.Where(x => x != ""))}");
+                sb.AppendLine($"=== {kind}: {all.Count} houses, masses: {string.Join(", ", masses.Where(x => x != ""))}; laid out: " +
+                              string.Join(", ", all.GroupBy(l => l.Scheme).OrderByDescending(g => g.Count()).Select(g => $"{g.Key} {g.Count()}")));
                 foreach (var (k, v) in m) sb.AppendLine($"  {k,-62} avg {v.Average(),7:0.00}  min {v.Min(),7:0.00}  max {v.Max(),7:0.00}");
                 int n = types.Values.Sum();
                 sb.AppendLine("  types: " + string.Join(", ", types.OrderByDescending(t => t.Value).Take(9).Select(t => $"{t.Key} {100f * t.Value / n:0}%")));
@@ -123,6 +124,15 @@ namespace Stealth.Tests
             }
             add("11 longest corridor, m", rooms.Where(r => r.Type == RoomType.Corridor).Select(r => Mathf.Max(r.Bounds.width, r.Bounds.height)).DefaultIfEmpty(0f).Max());
             add("12 median room m2", rooms.Select(r => r.Area).OrderBy(x => x).ElementAt(rooms.Count / 2));
+            // what tells one kind's layout from another's (LayoutSignature)
+            add("19 layout: corridor share of the floor", LayoutSignature.CorridorShare(l));
+            add("19 layout: islands a floor", LayoutSignature.Islands(l));
+            add("19 layout: biggest room, m2", LayoutSignature.BiggestRoom(l));
+            add("19 layout: longest straight corridor, m", LayoutSignature.LongestStraight(l));
+            add("19 layout: widest place in the corridors, m", LayoutSignature.WidestCorridor(l));
+            add("19 layout: houses with a court or an atrium", LayoutSignature.Court(l) > 0f ? 1f : 0f);
+            add("19 layout: mirrored about the entrance", LayoutSignature.Symmetry(l));
+            add("17 plans drawn before one held", l.PlanAttempt + 1);
             add("12 share of area in rooms over 60 m2", rooms.Where(r => r.Area > 60f && r.Type != RoomType.Corridor).Sum(r => r.Area) / rooms.Sum(r => r.Area));
             int same = 0, cells = 0;
             for (int f = 1; f < plan.Floors; f++)

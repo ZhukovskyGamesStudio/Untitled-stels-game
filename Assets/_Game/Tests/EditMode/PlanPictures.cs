@@ -109,6 +109,31 @@ namespace Stealth.Tests
             }
         }
 
+        /// <summary>
+        /// Logs/plans/&lt;kind&gt;_&lt;seed&gt;_&lt;house&gt;.png — houses of each kind side by side, to see that the kinds are laid out
+        /// differently: PLANKINDS=Office,Business picks the kinds (all of them by default), PLANCOUNT how many of each (3).
+        /// The game's own level settings.
+        /// </summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteKindPlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            var config = UnityEditor.AssetDatabase.LoadAssetAtPath<Stealth.Configs.LevelConfig>("Assets/_Game/Data/Config/Level.asset");
+            if (!int.TryParse(System.Environment.GetEnvironmentVariable("PLANCOUNT"), out int count)) count = 3;
+            var only = System.Environment.GetEnvironmentVariable("PLANKINDS");
+            foreach (HouseKind kind in System.Enum.GetValues(typeof(HouseKind)))
+            {
+                if (kind == HouseKind.TestRooms || !string.IsNullOrEmpty(only) && System.Array.IndexOf(only.Split(','), kind.ToString()) < 0) continue;
+                for (int n = 0; n < count; n++)
+                {
+                    int house = 1 + n % 3, seed = HouseKinds.SeedOf(kind, house, 900 + 37 * n);
+                    var l = LevelGenerator.Generate(seed, house, config != null ? config.Building : null, config != null ? config.Security : null, 1, null);
+                    File.WriteAllBytes(Path.Combine(dir, $"{kind.ToString().ToLowerInvariant()}_{seed}_{house}.png"), Draw(l));
+                }
+            }
+        }
+
         static Color TypeColor(RoomType t) => t switch
         {
             RoomType.FlatHall => new Color(0.85f, 0.8f, 0.7f),

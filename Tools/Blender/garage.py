@@ -207,11 +207,14 @@ def sedan(p, hood_open=False, wheels=True, extras=None):
     p.add("Trim", glass)
     if extras is not None:                                    # what one sees through the glass: the deck, seats, the dash, the wheel
         ex.append((s.rbox((1.3, 2.2, 0.03), (0, 0.2, 0.892), r=0.008, seg=1), "black"))
+        # the seats' backs, as high as the glass shows them: the front pair under the middle of the roof, the rear bench
+        # under its back edge — ahead of the sloping rear glass, not under it (it stood through the glass), the parcel
+        # shelf (the deck) behind it
         for sx in (-1, 1):
-            ex.append((s.rbox((0.46, 0.13, 0.5), (sx * 0.36, 0.06, 1.06), r=0.05, seg=2, rot=(-0.2, 0, 0)), "canvas"))
-            ex.append((s.rbox((0.24, 0.09, 0.15), (sx * 0.36, 0.13, 1.3), r=0.035, seg=2, rot=(-0.2, 0, 0)), "canvas"))
-            ex.append((s.rbox((0.22, 0.09, 0.13), (sx * 0.38, 1.12, 1.26), r=0.03, seg=2, rot=(-0.3, 0, 0)), "canvas"))
-        ex.append((s.rbox((1.24, 0.14, 0.44), (0, 1.02, 1.03), r=0.05, seg=2, rot=(-0.3, 0, 0)), "canvas"))
+            ex.append((s.rbox((0.46, 0.12, 0.42), (sx * 0.36, 0.05, 1.04), r=0.05, seg=2, rot=(-0.2, 0, 0)), "canvas"))
+            ex.append((s.rbox((0.22, 0.08, 0.12), (sx * 0.36, 0.11, 1.27), r=0.035, seg=2, rot=(-0.2, 0, 0)), "canvas"))
+            ex.append((s.rbox((0.2, 0.08, 0.1), (sx * 0.36, 0.78, 1.215), r=0.03, seg=2, rot=(-0.25, 0, 0)), "canvas"))
+        ex.append((s.rbox((1.2, 0.13, 0.34), (0, 0.71, 1.02), r=0.05, seg=2, rot=(-0.25, 0, 0)), "canvas"))
         ex.append((s.rbox((1.34, 0.36, 0.1), (0, -0.74, 0.94), r=0.04, seg=2), "black"))
         ex.append((s.rbox((0.34, 0.2, 0.07), (-0.36, -0.66, 1.0), r=0.03, seg=2), "black"))                       # the binnacle
         ring = [(-0.36 + 0.17 * math.cos(2 * math.pi * k / 12), -0.47 - 0.07 * math.sin(2 * math.pi * k / 12), 1.04 + 0.16 * math.sin(2 * math.pi * k / 12)) for k in range(13)]

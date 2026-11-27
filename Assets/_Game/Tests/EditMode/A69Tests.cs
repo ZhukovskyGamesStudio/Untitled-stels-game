@@ -50,6 +50,29 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void APlayersProbesSkipADesksScreen()
+        {
+            // the body's own probes (headroom to stand up, the ground under it) do not meet what the body goes through
+            var desk = Object.Instantiate(Prop("Desk"), new Vector3(300f, 50f, 300f), Quaternion.identity);
+            try
+            {
+                var passable = desk.GetComponent<PassableForPlayers>();
+                passable.Track(true);
+                Physics.SyncTransforms();
+                var screen = passable.Parts[0];
+                var over = new Vector3(screen.bounds.center.x, screen.bounds.max.y + 0.5f, screen.bounds.center.z);
+                Assert.IsTrue(Physics.Raycast(over, Vector3.down, out var plain, 3f) && plain.collider == screen, "the screen is solid to everything else");
+                Assert.IsTrue(PassableForPlayers.IsPart(screen));
+                Assert.IsTrue(PassableForPlayers.Raycast(over, Vector3.down, out var hit, 3f, ~0), "the desk under the screen");
+                Assert.IsFalse(passable.Has(hit.collider), $"met {hit.collider.name}");
+                Assert.Greater(hit.distance, plain.distance + 0.2f);
+                passable.Track(false);
+                Assert.IsFalse(PassableForPlayers.IsPart(screen));
+            }
+            finally { Object.DestroyImmediate(desk); }
+        }
+
+        [Test]
         public void APlayersBodyGoesThroughATerminalsMonitors()
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/Terminal.prefab");

@@ -237,6 +237,7 @@ namespace Stealth.Player
             m_Controller.enabled = false;
             transform.SetPositionAndRotation(position, rotation);
             m_Controller.enabled = true;
+            Stealth.Level.PassableForPlayers.Refresh(m_Controller); // (a body switched off and on has lost what it went through)
             if (Motor != null) Motor.ResetMotion();
             Link.Teleport(position, rotation);
             // A teleport is not running: motion and seismic sensors must not feel it (host side; remote jumps are filtered by speed).

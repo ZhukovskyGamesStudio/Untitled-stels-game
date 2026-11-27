@@ -50,6 +50,7 @@ namespace Stealth.Player
                     Motor.SetPitch(6f);
                 }
                 m_Controller.enabled = !seated;
+                if (!seated) Stealth.Level.PassableForPlayers.Refresh(m_Controller); // (out of the seat: through desk monitors again)
                 Audio.Sfx.At(Audio.Sfx.Bank?.Land, transform.position, 0.6f, Audio.Sfx.Group.Footsteps);
             }
             if (!seated) return;

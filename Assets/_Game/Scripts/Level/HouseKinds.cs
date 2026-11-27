@@ -134,11 +134,15 @@ namespace Stealth.Level
             switch (kind)
             {
                 case HouseKind.Business:
+                    s.Layout = OfficeLayout.Court;
+                    s.LinkedChance = 0f; // (pavilions joined by corridors are the plain office's other plan)
                     s.AtriumChance = Mathf.Min(1f, b.AtriumChance * 2f);
                     s.RotundaChance = b.RotundaChance * 1.6f;
                     s.RoomSizeScale = b.RoomSizeScale * 1.3f;
                     break;
                 case HouseKind.DataCenter:
+                    s.Layout = OfficeLayout.Grid;
+                    s.LinkedChance = 0f;
                     s.CorridorChance = 1f;
                     s.AtriumChance = b.AtriumChance * 0.3f;
                     s.RotundaChance = b.RotundaChance * 0.3f;
@@ -147,6 +151,8 @@ namespace Stealth.Level
                     s.RoomSizeScale = b.RoomSizeScale * 0.85f;
                     break;
                 case HouseKind.Warehouse:
+                    s.Layout = OfficeLayout.Sheds;
+                    s.LinkedChance = 0f;
                     s.CorridorChance = b.CorridorChance * 0.35f;
                     s.AtriumChance = Mathf.Min(1f, b.AtriumChance * 1.8f);
                     s.RotundaChance = 0f;
@@ -154,6 +160,8 @@ namespace Stealth.Level
                     s.RoomSizeScale = b.RoomSizeScale * 1.7f;
                     break;
                 case HouseKind.Headquarters:
+                    s.Layout = OfficeLayout.Axis;
+                    s.LinkedChance = 0f;
                     s.RotundaChance = b.RotundaChance * 3f;
                     s.CornerCutChance = Mathf.Min(1f, b.CornerCutChance * 1.6f);
                     s.RoomSizeScale = b.RoomSizeScale * 0.9f;

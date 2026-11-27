@@ -94,7 +94,17 @@ namespace Stealth.Tests
             var s = TestHouses.Make(officeSeed, 1, onlyServers);
             // the locked storage room comes from the house's features, not from the weights
             // (the plant room off the lobby is one of them, and the robots' charging room, taken over)
-            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall or RoomType.Storage or RoomType.Utility or RoomType.ChargingStation, room.Type.ToString());
+            // (an office of blocks cuts its rooms before it types them: a room no server room's rule fits — too big, too
+            // small — is plain: an office or open space)
+            int servers = 0, plain = 0;
+            foreach (var room in s.Rooms)
+            {
+                Assert.IsTrue(room.Type is RoomType.Server or RoomType.Office or RoomType.OpenSpace or RoomType.Lobby or RoomType.Corridor or RoomType.Hall or RoomType.Storage
+                    or RoomType.Utility or RoomType.ChargingStation, room.Type.ToString());
+                if (room.Type == RoomType.Server) servers++;
+                else if (room.Type is RoomType.Office or RoomType.OpenSpace) plain++;
+            }
+            Assert.Greater(servers, 2 * plain, $"{servers} server rooms, {plain} plain ones: the weights ask for servers only");
         }
 
         [Test]

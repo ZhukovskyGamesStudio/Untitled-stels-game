@@ -4,6 +4,13 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
+    /// How an office of blocks is laid out: each kind of office house a plan of its own (<see cref="HouseKinds.Apply"/>;
+    /// the schemes themselves — PlanGenerator.Blocks). Racetrack: the office. Court: the business centre. Grid: the data
+    /// centre. Sheds: the warehouse. Axis: the headquarters. Append only (the value is in the level settings).
+    /// </summary>
+    public enum OfficeLayout : byte { Racetrack, Court, Grid, Sheds, Axis }
+
+    /// <summary>
     /// Blocks first, corridors between them (Docs/LevelRefinementPlan.md, section 4; prototype Tools/Prototypes/layouts.py):
     /// the mass of a building is a set of wings that overlap, step and turn; it is cut into blocks of 8–15 m by a staggered
     /// partition; the corridors then grow from the entrance along the edges between blocks — the cheapest way to the next
@@ -14,11 +21,42 @@ namespace Stealth.Level
     /// </summary>
     public static partial class PlanGenerator
     {
+        /// <summary>
+        /// How a building of blocks is laid out. Every kind of house has a scheme of its own — its own masses, its own way
+        /// of cutting blocks, its own corridors — so two kinds are never one plan with other numbers.
+        /// Streets (the hospital): corridors that wander between the blocks, cross and loop; rows of rooms, departments.
+        /// Hub (the abandoned station): a hall in the middle, a straight spoke down every arm, hardly a loop.
+        /// Racetrack (the office): a ring corridor a room's depth from the facade, cellular rooms outside it, a core inside.
+        /// Court (the business centre): an atrium through the floors, a gallery round it, suites between it and the facade.
+        /// Grid (the data centre): halls as islands, an aisle on every side of each.
+        /// Sheds (the warehouse): a strip of rooms along the front, one corridor behind it, big halls opening into each other.
+        /// Axis (the headquarters): a gallery straight on from the lobby, a cross gallery behind it, the plan mirrored.
+        /// (The repair shop and the apartment block have plans of their own: PlanGenerator.Garage, PlanGenerator.Apartments.)
+        /// </summary>
+        enum Scheme : byte { Streets, Hub, Racetrack, Court, Grid, Sheds, Axis }
+
         /// <summary>The building's blocks and corridors (metres for the blocks, plan cells for the corridors).</summary>
         sealed class BlockPlan
         {
             public int W, D;
             public bool Station;
+            /// <summary>An office of any kind: open plans with pods, departments, rows of offices; its rooms' types by the kind's weights.</summary>
+            public bool Office;
+            /// <summary>How it is laid out: its kind of house's own scheme.</summary>
+            public Scheme Scheme;
+            /// <summary>Court: the atriums, metres (the building's: every floor keeps them whole, a gallery round each).</summary>
+            public List<RectInt> Courts = new();
+            public bool[,] Ring;        // [x, z] metre cell: the ring corridor runs round these (a racetrack's core, a court) a metre out
+            public bool[,] Front;       // [x, z] metre cell of the front of house (Sheds: the strip by the lobby; Grid: by the lobby and the stairs)
+            public bool HasLine, HasAxis;
+            /// <summary>Grid points, stretch by stretch: the corridor behind the lobby (Sheds, Axis) and the gallery straight on from it (Axis).</summary>
+            public readonly List<(Vector2Int a, Vector2Int b)> FrontLines = new(), AxisLines = new();
+            public int AxisMid;
+            public bool MirrorInX;      // the axis runs along z: the plan is mirrored in x
+            /// <summary>The biggest block that stays one room, m² (a lab hall at the station, a store at the warehouse; a hospital's rooms are small).</summary>
+            public int Hall = 75;
+            /// <summary>What a block becomes, as weights (one room, back to back, a cluster, a pinwheel, open plan); null: the hospital's or the station's.</summary>
+            public float[] Weights;
             /// <summary>The width of a room in a row, metres: one through the building, its rhythm (a double room is two).</summary>
             public int Module = 5;
             /// <summary>How often a row has a double room (the top floor of a hospital more: its theatres).</summary>
@@ -111,6 +149,35 @@ namespace Stealth.Level
                     l.Add(new RectInt(0, z, a, k)); l.Add(new RectInt(x, 0, k, b)); l.Add(new RectInt(x - r.Next(4, 9), z - r.Next(2, 7), k + 12, k + 8));
                     break;
                 }
+                case "spokes":
+                {
+                    // a hub and an arm straight out of each side (one of them missing in some houses)
+                    int c = S(20), k = r.Next(15, 19), drop = r.Next(6);
+                    int Off() => (c - k) / 2 + r.Next(-2, 3);
+                    l.Add(new RectInt(0, 0, c, c));
+                    if (drop != 0) l.Add(new RectInt(Off(), c - 2, k, S(r.Next(18, 31)) + 2));
+                    if (drop != 1) l.Add(new RectInt(c - 2, Off(), S(r.Next(18, 31)) + 2, k));
+                    if (drop != 2) { int n = S(r.Next(18, 31)); l.Add(new RectInt(Off(), -n, k, n + 2)); }
+                    if (drop != 3) { int n = S(r.Next(18, 31)); l.Add(new RectInt(-n, Off(), n + 2, k)); }
+                    break;
+                }
+                case "dumbbell":
+                {
+                    // two hubs and the bridge between them, an arm out of each (and some off the ends)
+                    int c = S(20), k = r.Next(15, 19), link = S(r.Next(16, 25)), x2 = c + link;
+                    int Off() => (c - k) / 2 + r.Next(-1, 2);
+                    l.Add(new RectInt(0, 0, c, c));
+                    l.Add(new RectInt(c - 2, Off(), link + 4, k));
+                    l.Add(new RectInt(x2, 0, c, c));
+                    foreach (int x in new[] { 0, x2 })
+                    {
+                        int n = S(r.Next(16, 27));
+                        l.Add(r.Next(2) == 0 ? new RectInt(x + Off(), c - 2, k, n + 2) : new RectInt(x + Off(), -n, k, n + 2));
+                    }
+                    if (r.Next(3) > 0) { int n = S(r.Next(14, 23)); l.Add(new RectInt(x2 + c - 2, Off(), n + 2, k)); }
+                    if (r.Next(3) > 0) { int n = S(r.Next(14, 23)); l.Add(new RectInt(-n, Off(), n + 2, k)); }
+                    break;
+                }
                 case "z":
                 {
                     int k = r.Next(20, 25), L = S(34), mid = S(30);
@@ -153,7 +220,7 @@ namespace Stealth.Level
         }
 
         static readonly string[] HospitalMasses = { "figure8", "comb", "deep", "pinwheel", "campus", "cross", "stagger" };
-        static readonly string[] StationMasses = { "pinwheel", "campus", "z", "stagger", "cross", "deep" };
+        static readonly string[] StationMasses = { "spokes", "dumbbell" }; // (a middle and arms: its hub and spokes; none of them the hospital's)
 
         /// <summary>The wings of a building of blocks (metres), sized so a floor is about <paramref name="area"/> m².</summary>
         static List<RectInt> BlockMass(Ctx c, System.Random rng, float area, bool station, out string kind)
@@ -163,8 +230,207 @@ namespace Stealth.Level
             int seed = rng.Next();
             var first = BlockShape(kind, new System.Random(seed), 1f);
             float s = Mathf.Clamp(Mathf.Sqrt(area / Mathf.Max(1f, UnionArea(first))), 0.55f, 2.4f);
-            c.Blocks = new BlockPlan { Station = station, Module = 4 + new System.Random(seed ^ 0x40D).Next(2) };
+            c.Blocks = new BlockPlan { Station = station, Scheme = station ? Scheme.Hub : Scheme.Streets, Hall = station ? 170 : 75, Module = 4 + new System.Random(seed ^ 0x40D).Next(2) };
             return BlockShape(kind, new System.Random(seed), s);
+        }
+
+        /// <summary>
+        /// The wings of an office of blocks (metres) and its scheme: the kind of house's own (<see cref="OfficeLayout"/>) —
+        /// its masses, what its blocks become, how big a room stays whole. A kind without open space has no open plans.
+        /// </summary>
+        static List<RectInt> OfficeMass(Ctx c, System.Random rng, float area, BuildingSettings b, out string kind)
+        {
+            bool open = false;
+            foreach (var w in b.RoomWeights) open |= w.Room == RoomType.OpenSpace && w.Weight > 0;
+            float o = open ? 1f : 0f;
+            var scheme = b.Layout switch
+            {
+                OfficeLayout.Court => Scheme.Court, OfficeLayout.Grid => Scheme.Grid, OfficeLayout.Sheds => Scheme.Sheds, OfficeLayout.Axis => Scheme.Axis,
+                _ => Scheme.Racetrack,
+            };
+            float scale = Mathf.Clamp(b.RoomSizeScale, 0.7f, 1.8f);
+            c.Blocks = new BlockPlan
+            {
+                Office = true,
+                Scheme = scheme,
+                Hall = scheme == Scheme.Grid ? 210 : scheme == Scheme.Sheds ? 280 : Mathf.Clamp(Mathf.RoundToInt(90f * scale * scale), 60, 220),
+                // (one room, back to back, a cluster, a pinwheel, open plan)
+                Weights = scheme switch
+                {
+                    Scheme.Court => new[] { 0.5f, 0.5f, 4f, 3f, 3f * o },    // suites: a reception and its rooms, open floors
+                    Scheme.Grid => new[] { 5f, 2f, 0f, 0f, 0f },             // halls
+                    Scheme.Sheds => new[] { 1f, 0f, 0f, 0f, 0f },
+                    Scheme.Axis => new[] { 0.6f, 4f, 2.5f, 0.4f, 0.6f * o }, // rows of offices, departments
+                    _ => new[] { 2.5f, 2f, 1f, 0.3f, 3f * o },               // the core: service rooms, meeting rooms, open floors
+                },
+            };
+            int seed = rng.Next();
+            c.Blocks.Module = 4 + new System.Random(seed ^ 0x40D).Next(2);
+            return SchemeShape(c, scheme, new System.Random(seed), area, out kind);
+        }
+
+        /// <summary>The masses of the offices' schemes (metres, x and z from 0), sized to <paramref name="area"/> m² a floor.</summary>
+        static List<RectInt> SchemeShape(Ctx c, Scheme scheme, System.Random r, float area, out string kind)
+        {
+            var l = new List<RectInt>();
+            int Even(float v) => Mathf.Max(2, Mathf.RoundToInt(v / 2f) * 2);
+            RectInt Cells(RectInt m) => new(m.x * M, m.y * M, m.width * M, m.height * M);
+            // a house too small for its scheme's masses: one block (its corridors and rooms the scheme's all the same)
+            if (area < (scheme == Scheme.Racetrack ? 800f : scheme == Scheme.Axis ? 1000f : scheme == Scheme.Sheds ? 500f : 0f))
+            {
+                kind = "block";
+                int d = Even(Mathf.Sqrt(area / Range(r, 1.2f, 1.7f)));
+                l.Add(new RectInt(0, 0, Even(area / d), d));
+                return l;
+            }
+            switch (scheme)
+            {
+                case Scheme.Court:
+                {
+                    // one deep block (two courts in a long one): the court, the gallery round it, 8 m and more of rooms behind
+                    bool two = area > 2400f && r.NextDouble() < 0.6;
+                    float aspect = two ? Range(r, 1.7f, 2f) : Range(r, 1f, 1.25f);
+                    int d = Even(Mathf.Sqrt(area / aspect)), w = Even(area / d), n = two ? 2 : 1;
+                    kind = two ? "courts" : "court";
+                    l.Add(new RectInt(0, 0, w, d));
+                    for (int i = 0; i < n; i++)
+                    {
+                        int a = Mathf.Clamp(Even(w / n * 0.3f), 10, 16), b = Mathf.Clamp(Even(d * 0.3f), 10, 16);
+                        if (w / n < a + 20 || d < b + 20) continue; // (too small a house for a court)
+                        int cx = w * (2 * i + 1) / (2 * n) + r.Next(-2, 3), cz = d / 2 + r.Next(-2, 3);
+                        var court = new RectInt(cx - a / 2, cz - b / 2, a, b);
+                        c.Blocks.Courts.Add(court);
+                        c.KeepClear.Add(Cells(new RectInt(court.x - 2, court.y - 2, a + 4, b + 4)));
+                        // the entrance: straight in front of the first court, the lobby as deep as the rooms there
+                        int depth = court.yMin - 2;
+                        if (i == 0 && depth >= 7 && depth <= 12) c.LobbyWant = Cells(new RectInt(cx - 5, 0, 10, depth));
+                    }
+                    break;
+                }
+                case Scheme.Grid:
+                {
+                    // a box, or two boxes side by side
+                    if (area > 1500f && r.NextDouble() < 0.5)
+                    {
+                        kind = "boxes";
+                        float share = Range(r, 0.55f, 0.65f);
+                        int d1 = Even(Mathf.Sqrt(area * share / Range(r, 1.1f, 1.4f))), w1 = Even(area * share / d1);
+                        int d2 = Even(d1 * Range(r, 0.6f, 0.8f)), w2 = Even(area * (1f - share) / d2);
+                        l.Add(new RectInt(0, 0, w1, d1));
+                        l.Add(new RectInt(w1 - 2, Even(r.Next(0, d1 - d2 + 1)), w2 + 2, d2));
+                    }
+                    else
+                    {
+                        kind = "box";
+                        int d = Even(Mathf.Sqrt(area / Range(r, 1.2f, 1.6f)));
+                        l.Add(new RectInt(0, 0, Even(area / d), d));
+                    }
+                    break;
+                }
+                case Scheme.Sheds:
+                {
+                    // one deep shed, or a row of them of different depths
+                    int n = area > 2200f ? r.Next(2, 4) : area > 1300f ? r.Next(1, 3) : 1;
+                    kind = n == 1 ? "shed" : "sheds";
+                    float left = area;
+                    int x = 0;
+                    for (int i = 0; i < n; i++)
+                    {
+                        float a = i == n - 1 ? left : area / n * Range(r, 0.8f, 1.2f);
+                        left -= a;
+                        int d = Even(Mathf.Clamp(Mathf.Sqrt(a / Range(r, 0.9f, 1.4f)), 28f, 44f)), w = Even(Mathf.Max(16f, a / d));
+                        l.Add(new RectInt(x, 0, w + (i < n - 1 ? 2 : 0), d));
+                        x += w;
+                    }
+                    break;
+                }
+                case Scheme.Axis:
+                {
+                    // mirrored about the entrance: a T, a bar with an entrance pavilion, a trident, an H — the lobby in the middle of the front
+                    int k = Even(r.Next(20, 25)), s = Even(r.Next(20, 25)), L, front = 0;
+                    var names = area < 1400f ? new[] { "tee", "pavilion" } : new[] { "tee", "pavilion", "trident", "aitch" };
+                    kind = names[r.Next(names.Length)];
+                    if (kind == "tee")
+                    {
+                        L = Even(Mathf.Max(s + 16, area * Range(r, 0.5f, 0.62f) / k));
+                        l.Add(new RectInt(0, 0, L, k));
+                        l.Add(new RectInt(L / 2 - s / 2, k - 2, s, Even(Mathf.Max(12f, (area - L * k) / s)) + 2));
+                    }
+                    else if (kind == "pavilion")
+                    {
+                        // the stem runs through: an entrance pavilion in front of the bar
+                        int f = Even(r.Next(8, 13));
+                        L = Even(Mathf.Max(s + 16, area * 0.5f / k));
+                        l.Add(new RectInt(0, f, L, k));
+                        l.Add(new RectInt(L / 2 - s / 2, 0, s, f + k + Even(Mathf.Max(12f, (area - L * k - s * f) / s))));
+                    }
+                    else if (kind == "trident")
+                    {
+                        int w = Even(r.Next(16, 21));
+                        L = Even(Mathf.Max(3 * w + 20, area * 0.42f / k));
+                        float rest = area - L * k;
+                        int side = Even(Mathf.Max(10f, rest * 0.29f / w));
+                        l.Add(new RectInt(0, 0, L, k));
+                        l.Add(new RectInt(L / 2 - s / 2, k - 2, s, Even(Mathf.Max(14f, rest * 0.42f / s)) + 2));
+                        l.Add(new RectInt(0, k - 2, w, side + 2));
+                        l.Add(new RectInt(L - w, k - 2, w, side + 2));
+                    }
+                    else
+                    {
+                        // two wings and the bar between them: the entrance in its middle, on the forecourt
+                        int gap = Even(Mathf.Max(18f, Mathf.Sqrt(area) * 0.45f));
+                        int D = Even(Mathf.Max(k + 12, (area - gap * k) / (2f * k)));
+                        front = Even((D - k) * Range(r, 0.3f, 0.5f));
+                        L = 2 * k + gap;
+                        l.Add(new RectInt(0, 0, k, D));
+                        l.Add(new RectInt(k + gap, 0, k, D));
+                        l.Add(new RectInt(k - 2, front, gap + 4, k));
+                    }
+                    int lw = 10 + 2 * r.Next(2), ld = 8 + r.Next(2), far = 0;
+                    foreach (var q in l) far = Mathf.Max(far, q.yMax);
+                    c.LobbyWant = Cells(new RectInt(L / 2 - lw / 2, front, lw, ld));
+                    // neither the gallery on the axis nor the one behind the lobby under a stair
+                    c.KeepClear.Add(Cells(new RectInt(L / 2 - 5, front + ld, 10, far)));
+                    c.KeepClear.Add(Cells(new RectInt(0, front + ld, L, 3)));
+                    break;
+                }
+                default:
+                {
+                    // wings deep enough for the ring: rooms, the corridor, a core, the corridor, rooms
+                    int k = Even(r.Next(24, 31));
+                    float total = area / k; // the wings' length, about
+                    var names = new List<string>();
+                    if (total <= 76f) names.Add("slab");
+                    if (total >= 60f) { names.Add("ell"); names.Add("zed"); }
+                    if (total >= 90f) names.Add("horseshoe");
+                    kind = names[r.Next(names.Count)];
+                    if (kind == "slab") l.Add(new RectInt(0, 0, Even(Mathf.Max(k + 8, total)), k));
+                    else if (kind == "ell")
+                    {
+                        int sum = Even(total + k), a = Even(sum * Range(r, 0.5f, 0.62f)), b = Mathf.Max(k + 8, sum - a);
+                        l.Add(new RectInt(0, 0, a, k));
+                        l.Add(new RectInt(r.Next(2) == 0 ? 0 : a - k, 0, k, b));
+                    }
+                    else if (kind == "zed")
+                    {
+                        int sum = Even(total + 2 * k);
+                        int a = Mathf.Max(k + 6, Even(sum * Range(r, 0.27f, 0.35f))), e = Mathf.Max(k + 6, Even(sum * Range(r, 0.27f, 0.35f)));
+                        int m = Mathf.Max(2 * k + 4, sum - a - e);
+                        l.Add(new RectInt(0, 0, a, k));
+                        l.Add(new RectInt(a - k, 0, k, m));
+                        l.Add(new RectInt(a - k, m - k, e, k));
+                    }
+                    else
+                    {
+                        int sum = Even(total + 2 * k), a = Even(Mathf.Max(2 * k + 12, sum * Range(r, 0.36f, 0.44f))), b = Even(Mathf.Max(k + 8, (sum - a) / 2f));
+                        l.Add(new RectInt(0, 0, a, k));
+                        l.Add(new RectInt(0, 0, k, b));
+                        l.Add(new RectInt(a - k, 0, k, b));
+                    }
+                    break;
+                }
+            }
+            return l;
         }
 
         // ------------------------------------------------------------------ blocks and corridors (once a building)
@@ -181,7 +447,7 @@ namespace Stealth.Level
             var pick = c.Rng(0xB10E);
             for (int f = 1; f < c.Floors; f++)
             {
-                var up = new BlockPlan { Station = ground.Station, Module = ground.Module, Doubles = ground.Doubles };
+                var up = new BlockPlan { Station = ground.Station, Office = ground.Office, Scheme = ground.Scheme, Courts = ground.Courts, Hall = ground.Hall, Weights = ground.Weights, Module = ground.Module, Doubles = ground.Doubles };
                 if (characters.Count == 0) characters.AddRange(new[] { Character.Rows, Character.Clusters, Character.Mixed });
                 int k = pick.Next(characters.Count);
                 up.Kind = characters[k];
@@ -228,22 +494,380 @@ namespace Stealth.Level
                 foreach (var h in c.Halls) if (h.floor + 1 == floor) { bp.LobbyBlock = bp.Reserved.Count; Reserve(h.hall); }
                 foreach (var h in c.Halls) if (h.floor == floor) { if (bp.LobbyBlock < 0) bp.LobbyBlock = bp.Reserved.Count; Reserve(h.hall); }
             }
-            // the rest: the biggest rectangles, each cut on its own (so the cut lines do not run through)
+            // the scheme's own parts first: a racetrack's core, the courts, the front of house, the halves of a mirrored plan
             int lo = 8, hi = bp.Station ? 16 : 15;
-            while (true)
-            {
-                var q = BiggestFree(bp);
-                if (q.width == 0) break;
-                Cut(bp, q, rng, lo, hi);
-            }
+            if (bp.Scheme >= Scheme.Racetrack) Lay(c, bp, rng, ref lo, ref hi);
+            // the rest: the biggest rectangles, each cut on its own (so the cut lines do not run through)
+            CutZone(bp, null, rng, lo, hi);
             MergeSlivers(bp);
             var net = new Network(bp, rng);
-            net.Grow(c);
-            net.Loops(bp.Station ? 3 : 4);
+            switch (bp.Scheme)
+            {
+                case Scheme.Hub:
+                    // from the middle outwards, straight down every arm; one shortcut at most
+                    net.Hub();
+                    net.Turn = 3f;
+                    net.Straight = 26;
+                    net.Grow(c);
+                    net.Loops(1);
+                    break;
+                case Scheme.Racetrack:
+                case Scheme.Court:
+                    // the ring (round the core, round each court), a way from the lobby to it, then whatever it leaves out
+                    net.Ring(bp.Ring);
+                    net.Join();
+                    net.Grow(c);
+                    net.Loops(2);
+                    break;
+                case Scheme.Grid:
+                    // an aisle between every two halls
+                    net.AllEdges(3);
+                    net.BreakStraights(StraightRun);
+                    net.Join();
+                    net.Grow(c);
+                    break;
+                case Scheme.Sheds:
+                    // the one corridor behind the front of house (the halls behind it open into each other)
+                    foreach (var (a, b) in bp.FrontLines) net.Line(a, b, true);
+                    net.Join();
+                    net.Grow(c, bp.HasLine);
+                    break;
+                case Scheme.Axis:
+                    // the gallery on the axis and the one across it behind the lobby; the rest keeps straight
+                    foreach (var (a, b) in bp.FrontLines) net.Line(a, b, false);
+                    foreach (var (a, b) in bp.AxisLines) net.Line(a, b, true);
+                    net.Turn = 3f;
+                    net.Straight = 24;
+                    net.Join();
+                    net.Grow(c);
+                    net.Loops(3);
+                    break;
+                default:
+                    net.Grow(c);
+                    net.Loops(4);
+                    break;
+            }
             net.Carve(c);
         }
 
-        static RectInt BiggestFree(BlockPlan bp)
+        /// <summary>A racetrack's rooms on the facade are this deep, metres: then the ring corridor, then the core.</summary>
+        const int BandDepth = 6;
+
+        /// <summary>Blocks cut from what is free (of <paramref name="zone"/>, if given): the biggest rectangle first, each cut on its own.</summary>
+        static void CutZone(BlockPlan bp, bool[,] zone, System.Random rng, int lo, int hi)
+        {
+            while (true)
+            {
+                var q = BiggestFree(bp, zone);
+                if (q.width == 0) break;
+                Cut(bp, q, rng, lo, hi);
+            }
+        }
+
+        /// <summary>
+        /// The scheme's own parts of a floor, before the rest is cut into blocks: a racetrack's core, the courts, the front of
+        /// house and the corridor behind the lobby, the two halves of a mirrored plan; and how big its blocks are.
+        /// </summary>
+        static void Lay(Ctx c, BlockPlan bp, System.Random rng, ref int lo, ref int hi)
+        {
+            int W = bp.W, D = bp.D;
+            switch (bp.Scheme)
+            {
+                case Scheme.Racetrack:
+                {
+                    var core = CoreOf(bp, BandDepth);
+                    CutZone(bp, core, rng, 8, 15);
+                    bp.Ring = Round(bp, core);
+                    break;
+                }
+                case Scheme.Court:
+                {
+                    // a court is a block nothing cuts and no corridor crosses, on every floor
+                    var courts = new bool[W, D];
+                    foreach (var q in bp.Courts)
+                    {
+                        bool free = true;
+                        for (int x = q.xMin; x < q.xMax && free; x++)
+                            for (int z = q.yMin; z < q.yMax && free; z++)
+                                free = x >= 0 && z >= 0 && x < W && z < D && bp.In[x, z] && bp.Block[x, z] < 0;
+                        if (!free) continue;
+                        int id = bp.Reserved.Count;
+                        bp.Reserved.Add(true);
+                        for (int x = q.xMin; x < q.xMax; x++)
+                            for (int z = q.yMin; z < q.yMax; z++) { bp.Block[x, z] = id; courts[x, z] = true; }
+                    }
+                    bp.Ring = Round(bp, courts);
+                    lo = 9;
+                    break;
+                }
+                case Scheme.Grid:
+                    lo = 11;
+                    bp.Front = NearReserved(bp, 8);
+                    break;
+                case Scheme.Sheds:
+                    FrontLine(c, bp);
+                    if (bp.Front != null) CutZone(bp, bp.Front, rng, 8, 14);
+                    lo = 13;
+                    hi = 19;
+                    break;
+                case Scheme.Axis:
+                    FrontLine(c, bp);
+                    bp.Front = null; // (its front is rooms like the rest of it)
+                    if (bp.HasAxis) Mirror(bp, rng, lo, hi);
+                    break;
+            }
+        }
+
+        /// <summary>Metres from each metre cell to the outside (Chebyshev: a cell on the facade 1; outside the building int.MaxValue).</summary>
+        static int[,] Distances(BlockPlan b)
+        {
+            int W = b.W, D = b.D;
+            bool InCell(int x, int z) => x >= 0 && z >= 0 && x < W && z < D && b.In[x, z];
+            var dist = new int[W, D];
+            var q = new Queue<Vector2Int>();
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++)
+                {
+                    dist[x, z] = int.MaxValue;
+                    if (!b.In[x, z]) continue;
+                    bool edge = false;
+                    for (int dx = -1; dx <= 1 && !edge; dx++)
+                        for (int dz = -1; dz <= 1 && !edge; dz++) edge = !InCell(x + dx, z + dz);
+                    if (edge) { dist[x, z] = 1; q.Enqueue(new Vector2Int(x, z)); }
+                }
+            while (q.Count > 0)
+            {
+                var p = q.Dequeue();
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        int x = p.x + dx, z = p.y + dz;
+                        if (!InCell(x, z) || dist[x, z] <= dist[p.x, p.y] + 1) continue;
+                        dist[x, z] = dist[p.x, p.y] + 1;
+                        q.Enqueue(new Vector2Int(x, z));
+                    }
+            }
+            return dist;
+        }
+
+        /// <summary>
+        /// A racetrack's core: what lies <paramref name="band"/> + 3 m and more from the facade (the rooms, the corridor) and
+        /// 3 m from the lobby and the stair halls (the corridor passes between), nowhere thinner than 4 m, no piece under 48 m².
+        /// Wings too narrow for it have none: the corridors grow down them as they come.
+        /// </summary>
+        static bool[,] CoreOf(BlockPlan bp, int band)
+        {
+            int W = bp.W, D = bp.D;
+            var dist = Distances(bp);
+            var raw = new bool[W, D];
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++)
+                {
+                    // (the rooms on the facade 2 m deeper in every other square of StraightRun m: the ring steps in and out, no
+                    // side of it one long straight)
+                    int deep = band + 3 + ((x / StraightRun + z / StraightRun) % 2 == 0 ? 0 : 2);
+                    if (!bp.In[x, z] || bp.Block[x, z] >= 0 || dist[x, z] < deep) continue;
+                    bool near = false;
+                    for (int dx = -2; dx <= 2 && !near; dx++)
+                        for (int dz = -2; dz <= 2 && !near; dz++)
+                        {
+                            int px = x + dx, pz = z + dz;
+                            near = px >= 0 && pz >= 0 && px < W && pz < D && bp.Block[px, pz] >= 0;
+                        }
+                    raw[x, z] = !near;
+                }
+            var core = new bool[W, D];
+            for (int x = 0; x + 4 <= W; x++)
+                for (int z = 0; z + 4 <= D; z++)
+                {
+                    bool all = true;
+                    for (int i = 0; i < 4 && all; i++)
+                        for (int j = 0; j < 4 && all; j++) all = raw[x + i, z + j];
+                    if (!all) continue;
+                    for (int i = 0; i < 4; i++)
+                        for (int j = 0; j < 4; j++) core[x + i, z + j] = true;
+                }
+            var seen = new bool[W, D];
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++)
+                {
+                    if (!core[x, z] || seen[x, z]) continue;
+                    var piece = new List<Vector2Int> { new(x, z) };
+                    seen[x, z] = true;
+                    for (int i = 0; i < piece.Count; i++)
+                        foreach (var d in Dirs4)
+                        {
+                            var n = piece[i] + d;
+                            if (n.x < 0 || n.y < 0 || n.x >= W || n.y >= D || !core[n.x, n.y] || seen[n.x, n.y]) continue;
+                            seen[n.x, n.y] = true;
+                            piece.Add(n);
+                        }
+                    if (piece.Count < 48) foreach (var q in piece) core[q.x, q.y] = false;
+                }
+            return core;
+        }
+
+        /// <summary>The cells and a metre round them (not into the lobby or a stair hall): the ring corridor follows this outline.</summary>
+        static bool[,] Round(BlockPlan bp, bool[,] mask)
+        {
+            int W = bp.W, D = bp.D;
+            var k = new bool[W, D];
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++)
+                {
+                    if (!bp.In[x, z]) continue;
+                    if (mask[x, z]) { k[x, z] = true; continue; }
+                    if (bp.Block[x, z] >= 0 && bp.Reserved[bp.Block[x, z]]) continue;
+                    for (int dx = -1; dx <= 1 && !k[x, z]; dx++)
+                        for (int dz = -1; dz <= 1 && !k[x, z]; dz++)
+                        {
+                            int px = x + dx, pz = z + dz;
+                            k[x, z] = px >= 0 && pz >= 0 && px < W && pz < D && mask[px, pz];
+                        }
+                }
+            return k;
+        }
+
+        /// <summary>The free cells within <paramref name="reach"/> m of the lobby or a stair hall (called before any block is cut).</summary>
+        static bool[,] NearReserved(BlockPlan bp, int reach)
+        {
+            int W = bp.W, D = bp.D;
+            var near = new bool[W, D];
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++)
+                {
+                    if (bp.Block[x, z] < 0) continue;
+                    for (int dx = -reach; dx <= reach; dx++)
+                        for (int dz = -reach; dz <= reach; dz++)
+                        {
+                            int px = x + dx, pz = z + dz;
+                            if (px >= 0 && pz >= 0 && px < W && pz < D && bp.In[px, pz] && bp.Block[px, pz] < 0) near[px, pz] = true;
+                        }
+                }
+            return near;
+        }
+
+        /// <summary>No corridor laid as a line runs straight for longer than this, metres: past it, it steps aside.</summary>
+        const int StraightRun = 28;
+
+        /// <summary>How far such a corridor steps aside, metres (its own width: one does not see down both stretches).</summary>
+        const int Jog = 3;
+
+        /// <summary>
+        /// The corridor behind the lobby: a line a metre in from the lobby's inner side, as far both ways as the building
+        /// goes (behind the facade side where it runs the longest); what lies between it and that facade is the front of
+        /// house. And the axis: straight on from the lobby's middle, away from the facade. Neither runs straight for more
+        /// than <see cref="StraightRun"/>: every other stretch steps <see cref="Jog"/> m aside (the lobby's own stays).
+        /// Called before any block is cut.
+        /// </summary>
+        static void FrontLine(Ctx c, BlockPlan bp)
+        {
+            int W = bp.W, D = bp.D;
+            int x0 = c.Lobby.xMin / M, z0 = c.Lobby.yMin / M, x1 = Mathf.CeilToInt(c.Lobby.xMax / (float)M), z1 = Mathf.CeilToInt(c.Lobby.yMax / (float)M);
+            bool Free(int x, int z) => x >= 0 && z >= 0 && x < W && z < D && bp.In[x, z] && bp.Block[x, z] < 0;
+            int best = 0;
+            for (int side = 0; side < 4; side++)
+            {
+                int dx = side == 2 ? -1 : side == 3 ? 1 : 0, dz = side == 0 ? -1 : side == 1 ? 1 : 0; // towards the facade
+                if (!SideOutside(c, c.Lobby, dx, dz)) continue;
+                bool alongX = side < 2, low = side is 0 or 2;
+                int at = side switch { 0 => z1 + 1, 1 => z0 - 1, 2 => x1 + 1, _ => x0 - 1 }, inward = low ? 1 : -1;
+                int mid = alongX ? (x0 + x1) / 2 : (z0 + z1) / 2;
+                // a step along a line (row) from point u to u + 1 has the cells u on both sides of it
+                bool Open(int u, int row) => alongX ? Free(u, row - 1) && Free(u, row) : Free(row - 1, u) && Free(row, u);
+                Vector2Int P(int u, int row) => alongX ? new Vector2Int(u, row) : new Vector2Int(row, u);
+                if (!Open(mid, at) || !Open(mid - 1, at)) continue;
+                int a = mid, b = mid;
+                while (Open(a - 1, at)) a--;
+                while (Open(b, at)) b++;
+                if (b - a <= best) continue;
+                best = b - a;
+                bp.HasLine = true;
+                bp.MirrorInX = alongX;
+                bp.FrontLines.Clear();
+                bp.AxisLines.Clear();
+                bp.Front = new bool[W, D];
+                // the stretches: the lobby's own in the middle of its run, then one every StraightRun both ways
+                var cuts = new List<int>();
+                if (b - a > StraightRun + 8)
+                {
+                    for (int u = Mathf.Max(a, mid - StraightRun / 2); u - a >= 10; u -= StraightRun) cuts.Add(u);
+                    cuts.Reverse();
+                    for (int u = Mathf.Min(b, mid + StraightRun / 2); b - u >= 10; u += StraightRun) cuts.Add(u);
+                }
+                cuts.Insert(0, a);
+                cuts.Add(b);
+                int home = 0;
+                for (int i = 0; i + 1 < cuts.Count; i++) if (mid >= cuts[i] && mid < cuts[i + 1]) home = i;
+                int last = at;
+                for (int i = 0; i + 1 < cuts.Count; i++)
+                {
+                    int u0 = cuts[i], u1 = cuts[i + 1], row = at + ((i - home) % 2 != 0 ? Jog * inward : 0);
+                    for (int u = u0; u < u1 && row != at; u++) if (!Open(u, row)) row = at; // (no room for the step: straight on)
+                    bp.FrontLines.Add((P(u0, row), P(u1, row)));
+                    if (i > 0 && row != last) bp.FrontLines.Add((P(u0, last), P(u0, row)));
+                    last = row;
+                    // the front of house: from the corridor to the facade
+                    for (int u = u0; u < u1; u++)
+                        for (int v = low ? row - 2 : row + 1; ; v -= inward)
+                        {
+                            int x = alongX ? u : v, z = alongX ? v : u;
+                            if (!Free(x, z)) break;
+                            bp.Front[x, z] = true;
+                        }
+                }
+                // the axis: a step along it from row v to v + inward has the cells of the row it enters on both sides
+                bool Ahead(int col, int v)
+                {
+                    int r = inward > 0 ? v : v - 1;
+                    return alongX ? Free(col - 1, r) && Free(col, r) : Free(r, col - 1) && Free(r, col);
+                }
+                Vector2Int Q(int col, int v) => alongX ? new Vector2Int(col, v) : new Vector2Int(v, col);
+                int e = at;
+                while (Ahead(mid, e)) e += inward;
+                int len = Mathf.Abs(e - at);
+                bp.HasAxis = len >= 8;
+                bp.AxisMid = mid;
+                if (!bp.HasAxis) continue;
+                int n = len > StraightRun + 8 ? Mathf.CeilToInt(len / (float)StraightRun) : 1, lastCol = mid;
+                for (int i = 0; i < n; i++)
+                {
+                    int v0 = at + inward * (len * i / n), v1 = at + inward * (len * (i + 1) / n);
+                    int col = mid + (i % 2 == 1 ? (i % 4 == 1 ? Jog : -Jog) : 0);
+                    for (int v = v0; v != v1 && col != mid; v += inward) if (!Ahead(col, v)) col = mid;
+                    bp.AxisLines.Add((Q(col, v0), Q(col, v1)));
+                    if (i > 0 && col != lastCol) bp.AxisLines.Add((Q(lastCol, v0), Q(col, v0)));
+                    lastCol = col;
+                }
+            }
+        }
+
+        /// <summary>A mirrored plan: the half on the low side of the axis is cut into blocks, the other half gets the same blocks mirrored.</summary>
+        static void Mirror(BlockPlan bp, System.Random rng, int lo, int hi)
+        {
+            int W = bp.W, D = bp.D, mid = bp.AxisMid;
+            bool inX = bp.MirrorInX;
+            var half = new bool[W, D];
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++) half[x, z] = (inX ? x : z) < mid;
+            int first = bp.Reserved.Count;
+            CutZone(bp, half, rng, lo, hi);
+            int n = bp.Reserved.Count;
+            var twin = new int[n];
+            for (int i = 0; i < n; i++) twin[i] = -1;
+            for (int x = 0; x < W; x++)
+                for (int z = 0; z < D; z++)
+                {
+                    int b = bp.Block[x, z];
+                    if (b < first || b >= n || !half[x, z]) continue;
+                    int mx = inX ? 2 * mid - 1 - x : x, mz = inX ? z : 2 * mid - 1 - z;
+                    if (mx < 0 || mz < 0 || mx >= W || mz >= D || !bp.In[mx, mz] || bp.Block[mx, mz] >= 0) continue;
+                    if (twin[b] < 0) { twin[b] = bp.Reserved.Count; bp.Reserved.Add(false); }
+                    bp.Block[mx, mz] = twin[b];
+                }
+        }
+
+        static RectInt BiggestFree(BlockPlan bp, bool[,] zone = null)
         {
             int W = bp.W, D = bp.D;
             var h = new int[D + 1];
@@ -251,7 +875,7 @@ namespace Stealth.Level
             int bestArea = 0;
             for (int x = 0; x < W; x++)
             {
-                for (int z = 0; z < D; z++) h[z] = bp.In[x, z] && bp.Block[x, z] < 0 ? h[z] + 1 : 0;
+                for (int z = 0; z < D; z++) h[z] = bp.In[x, z] && bp.Block[x, z] < 0 && (zone == null || zone[x, z]) ? h[z] + 1 : 0;
                 h[D] = 0;
                 var st = new Stack<(int start, int height)>();
                 for (int z = 0; z <= D; z++)
@@ -342,7 +966,14 @@ namespace Stealth.Level
             readonly HashSet<Vector2Int> m_Net = new();
             readonly HashSet<(Vector2Int, Vector2Int)> m_Edges = new();
             readonly int[] m_Size, m_Touch;
+            readonly HashSet<(Vector2Int, Vector2Int)> m_MainEdges = new(); // steps that are the main way whatever the rest (a gallery)
+            readonly bool[,] m_At;      // [x, z] grid point is on the network (m_Net, for the search)
+            readonly bool[,,] m_Has;    // [x, z, 0 / 1] the step from the point towards +x / +z is a corridor (m_Edges, for the search)
             Vector2Int m_Start;
+            bool m_Hub;
+            /// <summary>What a turn costs and how long a straight may run before every step of it costs more (metres).</summary>
+            public float Turn = 1.6f;
+            public int Straight = 15;
             static readonly Vector2Int[] Steps = { Vector2Int.right, Vector2Int.up, Vector2Int.left, Vector2Int.down };
 
             public Network(BlockPlan b, System.Random rng)
@@ -354,33 +985,12 @@ namespace Stealth.Level
                 int n = b.Reserved.Count;
                 m_Size = new int[n];
                 m_Touch = new int[n];
+                m_At = new bool[m_W + 2, m_D + 2];
+                m_Has = new bool[m_W + 2, m_D + 2, 2];
                 for (int x = 0; x < m_W; x++)
                     for (int z = 0; z < m_D; z++) if (b.Block[x, z] >= 0) m_Size[b.Block[x, z]]++;
                 // metres from each cell to the outside (Chebyshev), then each grid point's least of its four cells
-                var dist = new int[m_W, m_D];
-                var q = new Queue<Vector2Int>();
-                for (int x = 0; x < m_W; x++)
-                    for (int z = 0; z < m_D; z++)
-                    {
-                        dist[x, z] = int.MaxValue;
-                        if (!b.In[x, z]) continue;
-                        bool edge = false;
-                        for (int dx = -1; dx <= 1 && !edge; dx++)
-                            for (int dz = -1; dz <= 1 && !edge; dz++) edge = !InCell(x + dx, z + dz);
-                        if (edge) { dist[x, z] = 1; q.Enqueue(new Vector2Int(x, z)); }
-                    }
-                while (q.Count > 0)
-                {
-                    var p = q.Dequeue();
-                    for (int dx = -1; dx <= 1; dx++)
-                        for (int dz = -1; dz <= 1; dz++)
-                        {
-                            int x = p.x + dx, z = p.y + dz;
-                            if (!InCell(x, z) || dist[x, z] <= dist[p.x, p.y] + 1) continue;
-                            dist[x, z] = dist[p.x, p.y] + 1;
-                            q.Enqueue(new Vector2Int(x, z));
-                        }
-                }
+                var dist = Distances(b);
                 m_Depth = new int[m_W + 1, m_D + 1];
                 for (int x = 0; x <= m_W; x++)
                     for (int z = 0; z <= m_D; z++)
@@ -389,6 +999,124 @@ namespace Stealth.Level
                         if (!InCell(x - 1, z - 1) || !InCell(x, z - 1) || !InCell(x - 1, z) || !InCell(x, z)) continue;
                         m_Depth[x, z] = Mathf.Min(5, Mathf.Min(Mathf.Min(dist[x - 1, z - 1], dist[x, z - 1]), Mathf.Min(dist[x - 1, z], dist[x, z])));
                     }
+                // the start: the lobby's edge point deepest in the building
+                int bestDepth = -1;
+                for (int x = 0; x <= m_W; x++)
+                    for (int z = 0; z <= m_D; z++)
+                    {
+                        var p = new Vector2Int(x, z);
+                        if (!Point(p) || m_Depth[x, z] <= bestDepth) continue;
+                        bool byLobby = false;
+                        foreach (var s in Steps)
+                        {
+                            var q2 = p + s;
+                            if (!Point(q2)) continue;
+                            var (i, j) = Sides(p, q2);
+                            if (i != j && (i == m_B.LobbyBlock || j == m_B.LobbyBlock)) byLobby = true;
+                        }
+                        if (!byLobby) continue;
+                        bestDepth = m_Depth[x, z];
+                        m_Start = p;
+                    }
+            }
+
+            /// <summary>
+            /// Hub and spokes: the corridors start in the middle of the building — the point deep inside it nearest its
+            /// centre, no lobby or stair hall beside it — where a hall is carved.
+            /// </summary>
+            public void Hub()
+            {
+                var mean = Vector2.zero;
+                int n = 0;
+                for (int x = 0; x < m_W; x++)
+                    for (int z = 0; z < m_D; z++) if (m_B.In[x, z]) { mean += new Vector2(x + 0.5f, z + 0.5f); n++; }
+                mean /= Mathf.Max(1, n);
+                float best = float.MaxValue;
+                for (int x = 1; x < m_W; x++)
+                    for (int z = 1; z < m_D; z++)
+                    {
+                        var p = new Vector2Int(x, z);
+                        if (!Point(p)) continue;
+                        bool reserved = false;
+                        for (int dx = -1; dx <= 0; dx++)
+                            for (int dz = -1; dz <= 0; dz++) { int b = m_B.Block[x + dx, z + dz]; reserved |= b >= 0 && m_B.Reserved[b]; }
+                        if (reserved) continue;
+                        float score = (new Vector2(x, z) - mean).magnitude - 4f * m_Depth[x, z];
+                        if (score < best) { best = score; m_Start = p; m_Hub = true; }
+                    }
+            }
+
+            /// <summary>A ring: every step along the outline of these cells (between a cell of them and a cell that is not).</summary>
+            public void Ring(bool[,] k)
+            {
+                if (k == null) return;
+                for (int x = 0; x <= m_W; x++)
+                    for (int z = 0; z <= m_D; z++)
+                        for (int e = 0; e < 2; e++)
+                        {
+                            var a = new Vector2Int(x, z);
+                            var b = a + Steps[e];
+                            if (!Point(a) || !Point(b)) continue;
+                            bool one = e == 0 ? k[x, z - 1] : k[x - 1, z], other = k[x, z];
+                            if (one == other || Cost(a, b) < 0f) continue;
+                            Add(new List<Vector2Int> { a, b });
+                        }
+            }
+
+            /// <summary>A straight corridor from grid point to grid point, wherever a step of it may run (the main way, if so).</summary>
+            public void Line(Vector2Int a, Vector2Int b, bool main)
+            {
+                var d = new Vector2Int(System.Math.Sign(b.x - a.x), System.Math.Sign(b.y - a.y));
+                if (d == Vector2Int.zero) return;
+                for (var p = a; p != b; p += d)
+                {
+                    var q = p + d;
+                    if (!Point(p) || !Point(q) || Cost(p, q) < 0f) continue;
+                    Add(new List<Vector2Int> { p, q });
+                    if (main) m_MainEdges.Add(Key(p, q));
+                }
+            }
+
+            /// <summary>An aisle between every two blocks (not the lobby's and the stair halls' sides), <paramref name="depth"/> m and more from the facade.</summary>
+            public void AllEdges(int depth)
+            {
+                for (int x = 0; x <= m_W; x++)
+                    for (int z = 0; z <= m_D; z++)
+                        for (int e = 0; e < 2; e++)
+                        {
+                            var a = new Vector2Int(x, z);
+                            var b = a + Steps[e];
+                            if (!Point(a) || !Point(b) || m_Depth[a.x, a.y] < depth || m_Depth[b.x, b.y] < depth) continue;
+                            var (i, j) = Sides(a, b);
+                            if (i < 0 || j < 0 || i == j || m_B.Reserved[i] || m_B.Reserved[j]) continue;
+                            Add(new List<Vector2Int> { a, b });
+                        }
+            }
+
+            /// <summary>One network: every part of it not joined to the start gets the cheapest way to what is.</summary>
+            public void Join()
+            {
+                m_Net.Add(m_Start);
+                m_At[m_Start.x, m_Start.y] = true;
+                for (int guard = 0; guard < 80; guard++)
+                {
+                    var seen = Along(m_Start);
+                    if (seen.Count >= m_Net.Count) return;
+                    var (cost, from) = Paths(seen.Keys, float.MaxValue, false);
+                    int pick = -1;
+                    float best = float.MaxValue;
+                    for (int k = 0; k < cost.Length; k++)
+                    {
+                        if (cost[k] >= best || k % 5 == 4 || from[k] < 0) continue;
+                        int cell = k / 5;
+                        var a = new Vector2Int(cell % (m_W + 1), cell / (m_W + 1));
+                        if (!At(a) || seen.ContainsKey(a)) continue;
+                        best = cost[k];
+                        pick = k;
+                    }
+                    if (pick < 0) return;
+                    Add(Back(from, pick));
+                }
             }
 
             bool InCell(int x, int z) => x >= 0 && z >= 0 && x < m_W && z < m_D && m_B.In[x, z];
@@ -403,6 +1131,71 @@ namespace Stealth.Level
             }
 
             static (Vector2Int, Vector2Int) Key(Vector2Int a, Vector2Int b) => a.x < b.x || a.x == b.x && a.y < b.y ? (a, b) : (b, a);
+
+            bool At(Vector2Int p) => p.x >= 0 && p.y >= 0 && p.x <= m_W && p.y <= m_D && m_At[p.x, p.y];
+
+            /// <summary>The step between two neighbouring grid points is a corridor.</summary>
+            bool Edge(Vector2Int a, Vector2Int b) => a.y == b.y ? m_Has[Mathf.Min(a.x, b.x), a.y, 0] : m_Has[a.x, Mathf.Min(a.y, b.y), 1];
+
+            void Mark(Vector2Int a, Vector2Int b, bool on)
+            {
+                if (a.y == b.y) m_Has[Mathf.Min(a.x, b.x), a.y, 0] = on; else m_Has[a.x, Mathf.Min(a.y, b.y), 1] = on;
+            }
+
+            /// <summary>A step of corridor taken out again (a point no step is left at leaves the network).</summary>
+            void Remove(Vector2Int a, Vector2Int b)
+            {
+                if (!m_Edges.Remove(Key(a, b))) return;
+                Mark(a, b, false);
+                m_MainEdges.Remove(Key(a, b));
+                var (i, j) = Sides(a, b);
+                if (i >= 0) m_Touch[i]--;
+                if (j >= 0 && j != i) m_Touch[j]--;
+                foreach (var p in new[] { a, b })
+                {
+                    bool any = false;
+                    foreach (var s in Steps) { var q = p + s; any |= q.x >= 0 && q.y >= 0 && q.x <= m_W && q.y <= m_D && Edge(p, q); }
+                    if (!any && p != m_Start) { m_Net.Remove(p); m_At[p.x, p.y] = false; }
+                }
+            }
+
+            /// <summary>
+            /// No aisle straight for more than <paramref name="run"/> m: of a longer one the stretch between two crossings
+            /// nearest its middle is taken out (the halls either side of it stand wall to wall there).
+            /// </summary>
+            public void BreakStraights(int run)
+            {
+                for (int pass = 0; pass < 60; pass++)
+                {
+                    bool cut = false;
+                    for (int dir = 0; dir < 2 && !cut; dir++) // along x, along z
+                        for (int line = 0; line <= (dir == 0 ? m_D : m_W) && !cut; line++)
+                        {
+                            int start = -1, n = dir == 0 ? m_W : m_D;
+                            Vector2Int P(int u) => dir == 0 ? new Vector2Int(u, line) : new Vector2Int(line, u);
+                            for (int u = 0; u <= n && !cut; u++)
+                            {
+                                if (u < n && Edge(P(u), P(u + 1))) { if (start < 0) start = u; continue; }
+                                if (start >= 0 && u - start > run)
+                                {
+                                    // crossings along it: the points an aisle leaves it sideways
+                                    var side = Steps[1 - dir];
+                                    bool Crossing(int k) => At(P(k) + side) && Edge(P(k), P(k) + side) || At(P(k) - side) && Edge(P(k) - side, P(k));
+                                    int mid = (start + u) / 2, a = mid, b = mid + 1;
+                                    while (a > start && !Crossing(a)) a--;
+                                    while (b < u && !Crossing(b)) b++;
+                                    if ((a > start || b < u) && b - a <= 20)
+                                    {
+                                        for (int k = a; k < b; k++) Remove(P(k), P(k + 1));
+                                        cut = true;
+                                    }
+                                }
+                                start = -1;
+                            }
+                        }
+                    if (!cut) return;
+                }
+            }
 
             float Cost(Vector2Int a, Vector2Int b)
             {
@@ -419,10 +1212,10 @@ namespace Stealth.Level
 
             /// <summary>
             /// Cheapest ways from <paramref name="src"/> (Dijkstra over point and heading): along the network almost free,
-            /// along a block edge 1, through a block more, near the facade much more, a turn 1.6, a straight past
-            /// <paramref name="straight"/> m 2.5 a step more.
+            /// along a block edge 1, through a block more, near the facade much more, a turn <see cref="Turn"/>, a straight
+            /// past <see cref="Straight"/> m 2.5 a step more.
             /// </summary>
-            (float[] cost, int[] from) Paths(IEnumerable<Vector2Int> src, float limit, bool fresh, ICollection<Vector2Int> avoid = null, int straight = 15)
+            (float[] cost, int[] from) Paths(IEnumerable<Vector2Int> src, float limit, bool fresh, ICollection<Vector2Int> avoid = null)
             {
                 int n = (m_W + 1) * (m_D + 1) * 5;
                 var cost = new float[n];
@@ -447,13 +1240,13 @@ namespace Stealth.Level
                         if (dir < 4 && e == (dir + 2) % 4) continue;
                         var b = a + Steps[e];
                         if (!Point(b)) continue;
-                        bool inNet = m_Edges.Contains(Key(a, b));
+                        bool inNet = Edge(a, b);
                         if (fresh && inNet) continue;
                         float step = inNet ? 0.3f : Cost(a, b);
                         if (step < 0f) continue;
                         if (!inNet && Beside(a, b)) step += 3f;
                         int nr = dir == e ? run[k] + 1 : 1;
-                        float nc = c + step + (dir < 4 && dir != e ? 1.6f : 0f) + (nr > straight ? 2.5f : 0f);
+                        float nc = c + step + (dir < 4 && dir != e ? Turn : 0f) + (nr > Straight ? 2.5f : 0f);
                         int nk = Index(b, e);
                         if (nc >= cost[nk]) continue;
                         cost[nk] = nc;
@@ -471,7 +1264,7 @@ namespace Stealth.Level
                 var d = b - a;
                 var side = new Vector2Int(d.y, d.x);
                 for (int k = 1; k <= 2; k++)
-                    if (m_Net.Contains(b + side * k) && m_Net.Contains(a + side * k) || m_Net.Contains(b - side * k) && m_Net.Contains(a - side * k)) return true;
+                    if (At(b + side * k) && At(a + side * k) || At(b - side * k) && At(a - side * k)) return true;
                 return false;
             }
 
@@ -490,39 +1283,24 @@ namespace Stealth.Level
                     var key = Key(path[i], path[i + 1]);
                     m_Net.Add(path[i]);
                     m_Net.Add(path[i + 1]);
+                    m_At[path[i].x, path[i].y] = m_At[path[i + 1].x, path[i + 1].y] = true;
                     if (!m_Edges.Add(key)) continue;
+                    Mark(path[i], path[i + 1], true);
                     var (a, b) = Sides(path[i], path[i + 1]);
                     m_Touch[a]++;
                     if (b != a) m_Touch[b]++;
                 }
             }
 
-            /// <summary>From the lobby's inner side, the cheapest way to the next block not met yet, until every block is met along 3 m.</summary>
-            public void Grow(Ctx c)
+            /// <summary>From the start (the lobby's inner side), the cheapest way to the next block not met yet, until every block is met along 3 m.</summary>
+            public void Grow(Ctx c, bool reservedOnly = false)
             {
-                // the start: the lobby's edge point deepest in the building
-                int bestDepth = -1;
-                for (int x = 0; x <= m_W; x++)
-                    for (int z = 0; z <= m_D; z++)
-                    {
-                        var p = new Vector2Int(x, z);
-                        if (!Point(p) || m_Depth[x, z] <= bestDepth) continue;
-                        bool byLobby = false;
-                        foreach (var s in Steps)
-                        {
-                            var q = p + s;
-                            if (!Point(q)) continue;
-                            var (i, j) = Sides(p, q);
-                            if (i != j && (i == m_B.LobbyBlock || j == m_B.LobbyBlock)) byLobby = true;
-                        }
-                        if (!byLobby) continue;
-                        bestDepth = m_Depth[x, z];
-                        m_Start = p;
-                    }
                 m_Net.Add(m_Start);
+                m_At[m_Start.x, m_Start.y] = true;
                 for (int guard = 0; guard < 400; guard++)
                 {
-                    bool Wanted(int i) => m_Touch[i] < 3 && (m_Size[i] >= 30 || m_B.Reserved[i] && m_Size[i] > 0);
+                    // (the lobby and the stair halls only: the halls of a shed open into each other)
+                    bool Wanted(int i) => m_Touch[i] < 3 && (m_Size[i] >= 30 && !reservedOnly || m_B.Reserved[i] && m_Size[i] > 0);
                     bool any = false;
                     for (int i = 0; i < m_Size.Length && !any; i++) any = Wanted(i);
                     if (!any) break;
@@ -535,7 +1313,7 @@ namespace Stealth.Level
                         int cell = k / 5;
                         var a = new Vector2Int(cell % (m_W + 1), cell / (m_W + 1));
                         var prev = a - Steps[k % 5];
-                        if (m_Edges.Contains(Key(prev, a))) continue;
+                        if (Edge(prev, a)) continue;
                         var (i, j) = Sides(prev, a);
                         float gain = (Wanted(i) ? m_Size[i] + (m_B.Reserved[i] ? 400 : 0) : 0) + (j != i && Wanted(j) ? m_Size[j] + (m_B.Reserved[j] ? 400 : 0) : 0);
                         if (gain <= 0f || m_Depth[a.x, a.y] < 3 && !(m_B.Reserved[i] || m_B.Reserved[j])) continue;
@@ -666,6 +1444,7 @@ namespace Stealth.Level
                     p = next;
                     main.Add(p);
                 }
+                if (m_MainEdges.Count > 0) main.Clear(); // (the plan has its main way: a gallery)
                 void Mark(int x0, int z0, int size, bool isMain)
                 {
                     for (int x = x0; x < x0 + size; x++)
@@ -680,13 +1459,14 @@ namespace Stealth.Level
                 }
                 foreach (var (p, q) in m_Edges)
                 {
-                    bool isMain = main.Contains(p) && main.Contains(q);
+                    bool isMain = main.Contains(p) && main.Contains(q) || m_MainEdges.Contains(Key(p, q));
                     int size = isMain ? MainCells : LaneCells;
                     // a 2 / 3 m square at every point of the edge (two points a metre apart: the squares join into a band)
                     foreach (var pt in new[] { p, q }) Mark(pt.x * M - 2, pt.y * M - 2, size, isMain);
                 }
                 // a hall at some crossings: waiting areas, the nurse station's lobby, a lift lobby
-                float hallChance = m_B.Station ? 0.2f : 0.15f;
+                float hallChance = m_B.Scheme switch { Scheme.Streets => 0.15f, Scheme.Hub => 0.08f, Scheme.Racetrack => 0.06f, Scheme.Axis => 0.25f, _ => 0f };
+                if (m_Hub && m_Depth[m_Start.x, m_Start.y] >= 4) { Mark2(m_Start.x * M - 7, m_Start.y * M - 7, 14, 14); m_B.Halls++; } // the hub
                 var pts = new List<Vector2Int>(m_Net);
                 pts.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
                 foreach (var p in pts)
@@ -753,7 +1533,7 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ one floor
 
         /// <summary>What a piece of a block became (it decides the room type later).</summary>
-        enum Piece : byte { Single, Row, Open, Pod, ClusterRoom, ClusterHall, Anteroom }
+        enum Piece : byte { Single, Row, Open, Pod, ClusterRoom, ClusterHall, Anteroom, Atrium }
 
         static void ZoneBlocks(Ctx c, int f, List<Region> regions, int[,] owner, System.Func<RectInt, Region, int> claim)
         {
@@ -809,8 +1589,9 @@ namespace Stealth.Level
                     var mine = new HashSet<Vector2Int>();
                     for (int x = q.xMin; x < q.xMax; x++) for (int z = q.yMin; z < q.yMax; z++) mine.Add(new Vector2Int(x, z));
                     var sides = Contact(bp, mine, q);
-                    bp.Doubles = !bp.Station && f == c.Floors - 1 && f > 0 ? 0.35 : 0.12; // (a hospital's top floor: room for two theatres)
-                    foreach (var (r, piece, cl) in Treat(bp, q, mine, sides, rng, ref cluster, !bp.Station && f > 0))
+                    bool hospital = !bp.Station && !bp.Office;
+                    bp.Doubles = hospital && f == c.Floors - 1 && f > 0 ? 0.35 : 0.12; // (a hospital's top floor: room for two theatres)
+                    foreach (var (r, piece, cl) in Treat(bp, q, mine, sides, rng, ref cluster, hospital && f > 0))
                     {
                         var reg = new Region
                         {
@@ -819,6 +1600,7 @@ namespace Stealth.Level
                             Typed = piece == Piece.ClusterHall,
                             Cluster = cl,
                             Piece = piece,
+                            Court = piece == Piece.Atrium,
                         };
                         ClaimIn(regions, owner, reg, r, mine);
                     }
@@ -871,7 +1653,7 @@ namespace Stealth.Level
             }
             // a hospital's top floor: two theatres want two plain rooms 5.5 m across on a corridor — two rooms of a row join
             // into one where there are not enough
-            if (!bp.Station && f == c.Floors - 1 && f > 0)
+            if (!bp.Station && !bp.Office && f == c.Floors - 1 && f > 0)
             {
                 bool Theatre(Region r) => r.Cells.Count > 0 && r.Type != RoomType.Corridor && !r.Fixed && Square(r) && Thin(r) >= 11 && AreaOf(r) >= 26f && AreaOf(r) <= 80f && nearCorridor.Contains(r);
                 int have = 0;
@@ -896,7 +1678,9 @@ namespace Stealth.Level
                 }
                 borders = Borders(owner, nx, nz);
             }
-            if (bp.Station) TypeStation(c, f, regions, rng); else TypeHospital(c, f, regions, rng, onCorridor, nearCorridor);
+            if (bp.Station) TypeStation(c, f, regions, rng);
+            else if (bp.Office) TypeOffice(c, f, regions, rng);
+            else TypeHospital(c, f, regions, rng, onCorridor, nearCorridor);
             KeepReachable(regions, borders);
             // a region's rectangles are its cells' (absorbed scraps brought rectangles bigger than what they gave)
             foreach (var reg in regions)
@@ -908,6 +1692,7 @@ namespace Stealth.Level
                 reg.Rects.AddRange(rects);
             }
             AssignTypes(c, f, regions);
+            Atriums(c, f, regions, owner); // (an office's: the hospital and the station have none)
             Commit(c, f, regions, owner);
         }
 
@@ -1016,28 +1801,68 @@ namespace Stealth.Level
             int sides = 0, front = 0;
             for (int s = 0; s < 4; s++) { if (on[s] >= 2) sides |= 1 << s; if (on[s] > on[front]) front = s; }
             bool opposite = (sides & 3) == 3 && q.width >= 9 || (sides & 12) == 12 && q.height >= 9;
+            var middle = new Vector2Int(q.x + q.width / 2, q.y + q.height / 2);
+            foreach (var court in bp.Courts) if (court.Contains(middle)) { o.Add((q, Piece.Atrium, -1)); return o; }
+            bool frontOfHouse = bp.Front != null && bp.Front[middle.x, middle.y];
+            if (bp.Scheme == Scheme.Sheds)
+            {
+                // the front of house: rooms side by side between the corridor and the facade
+                if (frontOfHouse) { Slices(o, q, front >= 2, rng, module: bp.Module + 1, doubles: 0.2); return o; }
+                // a bay: one hall, or halls one behind the other (the far ones through the near ones)
+                int n = Mathf.Max(1, Mathf.CeilToInt(area / (float)bp.Hall));
+                var (W, D, f) = Orient(q, front);
+                bool deep = D >= W;
+                int L = deep ? D : W;
+                for (int i = 0; i < n; i++)
+                {
+                    int a = L * i / n, b = L * (i + 1) / n;
+                    o.Add((deep ? f(0, a, W, b - a) : f(a, 0, b - a, D), Piece.Single, -1));
+                }
+                return o;
+            }
+            if (bp.Scheme == Scheme.Grid && !frontOfHouse)
+            {
+                // a hall: an island between its aisles, whole or in two back to back
+                if (m < 9 || area <= bp.Hall && rng.NextDouble() < 0.6) o.Add((q, Piece.Single, -1));
+                else if (q.width >= q.height)
+                {
+                    int k = q.width / 2;
+                    o.Add((new RectInt(q.x, q.y, k, q.height), Piece.Single, -1));
+                    o.Add((new RectInt(q.x + k, q.y, q.width - k, q.height), Piece.Single, -1));
+                }
+                else
+                {
+                    int k = q.height / 2;
+                    o.Add((new RectInt(q.x, q.y, q.width, k), Piece.Single, -1));
+                    o.Add((new RectInt(q.x, q.y + k, q.width, q.height - k), Piece.Single, -1));
+                }
+                return o;
+            }
             // weights by the kind of building
             float single = bp.Station ? 3.5f : 0.4f, rows = 0f, back = bp.Station ? 1f : 5f, clu = bp.Station ? 3f : 2.5f, pin = bp.Station ? 3f : 1f, open = bp.Station ? 1f : 0.5f;
+            if (bp.Weights != null) { single = bp.Weights[0]; back = bp.Weights[1]; clu = bp.Weights[2]; pin = bp.Weights[3]; open = bp.Weights[4]; }
+            if (bp.Scheme == Scheme.Grid) { single = 0.3f; back = 4f; clu = 2f; pin = 0f; open = 0f; } // (its front of house: small rooms)
             if (area < 64 || m < 4) { o.Add((q, Piece.Single, -1)); return o; }
-            if (m <= 8 && area > (bp.Station ? 170 : 75)) single = 0f;
-            if (m <= 8) { rows = 4f; single = area < 110 || bp.Station ? 1f : 0.15f; back = clu = pin = open = 0f; }
+            if (m <= 8 && area > bp.Hall) single = 0f;
+            if (m <= 8) { rows = 4f; single = bp.Scheme == Scheme.Racetrack ? 0.4f : area < 110 || bp.Station ? 1f : 0.15f; back = clu = pin = open = 0f; }
             else
             {
                 if (area < 100 || sides == 0) clu = 0f;
                 if (m < 11 || area < 130 || sides == 0) pin = 0f;
                 if (area < 120) open = 0f;
                 if (!opposite) back = 0f;
-                if (area > 150 && !bp.Station) single = 0.25f;
+                if (area > 150 && bp.Hall < 150) single = Mathf.Min(single, 0.25f);
             }
             if (wards) { back *= 2f; pin *= 0.5f; open *= 0.3f; }
-            if (bp.Kind == Character.Rows) { back *= 2f; rows *= 2f; clu *= 0.3f; pin *= 0.3f; }
+            if (bp.Scheme >= Scheme.Racetrack) { } // (an office's floors keep their scheme)
+            else if (bp.Kind == Character.Rows) { back *= 2f; rows *= 2f; clu *= 0.3f; pin *= 0.3f; }
             else if (bp.Kind == Character.Clusters) { clu *= wards ? 1.8f : 3f; pin *= 1.5f; back *= wards ? 0.8f : 0.5f; } // (a ward floor keeps its rows on the facade)
             float total = single + rows + back + clu + pin + open, roll = (float)rng.NextDouble() * total;
             int id = cluster++;
             if ((roll -= single) < 0f)
             {
                 // one room, as big as the kind of building has them (a lab hall at the station; a hospital's rooms are small)
-                if (area <= (bp.Station ? 170 : 75)) o.Add((q, Piece.Single, -1));
+                if (area <= bp.Hall) o.Add((q, Piece.Single, -1));
                 else
                 {
                     var (W, D, f) = Orient(q, front);
@@ -1284,6 +2109,74 @@ namespace Stealth.Level
         }
 
         /// <summary>The station: labs, control and servers below, the staff's quarters above, the computing floor on top.</summary>
+        /// <summary>
+        /// An office's rooms follow its room program (<see cref="RoomProgram"/>: what the kind of house has on this floor
+        /// and how big): every room of the program, the ones the house must have first, then the biggest, takes the room
+        /// that fits its type's rule and is nearest its size — the open space an open plan, the toilets by the stairs and off
+        /// the facade, a control room, a kitchen or a meeting room a plain rectangle (their consoles, run and table want a
+        /// wall), no anteroom anything but an office or a lounge. What the program did not ask for gets its type from the
+        /// kind's weights (<see cref="AssignTypes"/>), as in an office of wings.
+        /// </summary>
+        static void TypeOffice(Ctx c, int f, List<Region> regions, System.Random rng)
+        {
+            var rooms = Typeable(regions);
+            foreach (var r in rooms) if (r.Piece == Piece.Atrium) { r.Type = RoomType.Lounge; r.Typed = true; } // the court
+            var core = HallCentres(c, f);
+            var wanted = new List<ProgramRoom>();
+            if (c.Program != null && f < c.Program.Floors.Length) wanted.AddRange(c.Program.Floors[f]);
+            // (a stable order: the must-haves, then by size, then as the program had them)
+            var order = new List<int>();
+            for (int k = 0; k < wanted.Count; k++) order.Add(k);
+            order.Sort((a, b) => wanted[a].Required != wanted[b].Required ? (wanted[a].Required ? -1 : 1)
+                : wanted[a].Area != wanted[b].Area ? wanted[b].Area.CompareTo(wanted[a].Area) : a.CompareTo(b));
+            bool openSpace = false, lounge = false, office = false;
+            foreach (var w in c.B.RoomWeights)
+            {
+                openSpace |= w.Room == RoomType.OpenSpace && w.Weight > 0;
+                lounge |= w.Room == RoomType.Lounge && w.Weight > 0;
+                office |= w.Room == RoomType.Office && w.Weight > 0;
+            }
+            foreach (int k in order)
+            {
+                var want = wanted[k];
+                // the locked storage room is the house's own (StorageRooms): the back rooms its weight stood for are offices
+                var type = want.Type == RoomType.Storage && !want.Required ? RoomType.Office : want.Type;
+                var rule = RoomRules.For(type, c.B.RoomTypeRules);
+                Region best = null;
+                float bs = float.MinValue;
+                foreach (var r in rooms)
+                {
+                    if (r.Typed) continue;
+                    var b = BoundsOf(r.Cells);
+                    float area = AreaOf(r), aspect = Mathf.Max(b.width, b.height) / (float)Mathf.Max(1, Mathf.Min(b.width, b.height));
+                    bool rect = r.Cells.Count == b.width * b.height;
+                    if (!RoomRules.Fits(rule, area, aspect, rule.OutsideWall > 0f ? OutsideWall(c, r) : 0f, rect)) continue;
+                    float s = -10f * Mathf.Abs(area - want.Area) / Mathf.Max(8f, want.Area) + (float)rng.NextDouble();
+                    if (type == RoomType.OpenSpace) s += r.Piece == Piece.Open ? 8f : 0f;
+                    else if (r.Piece == Piece.Open) s -= 6f;
+                    if (r.Piece == Piece.Anteroom && type is not (RoomType.Office or RoomType.Lounge)) s -= 12f;
+                    if (type is RoomType.Restroom or RoomType.LockerRoom or RoomType.Storage or RoomType.Server or RoomType.CopyRoom) s -= Facade(c, r) * 0.5f;
+                    if (type == RoomType.Restroom) s -= Near(core, r) * 0.5f + (r.Cluster >= 0 ? 10f : 0f);
+                    if (type is RoomType.ControlRoom or RoomType.Kitchen or RoomType.Meeting) s += rect && Thin(r) >= 8 ? 4f : -4f;
+                    // private rooms lie away from the lobby and the stairs, public ones by them (RoomRule.Privacy: +1 deep, −1 near)
+                    s += rule.Privacy * Mathf.Min(Near(core, r), 30f) * 0.25f;
+                    if (s > bs) { bs = s; best = r; }
+                }
+                if (best == null) continue;
+                best.Type = type;
+                best.Typed = true;
+                best.Required = want.Required;
+            }
+            foreach (var r in rooms)
+            {
+                if (r.Typed) continue;
+                // an open plan nobody asked for is open space all the same; an anteroom is the way into its suite
+                if (r.Piece == Piece.Open && openSpace && AreaOf(r) >= 28f) { r.Type = RoomType.OpenSpace; r.Typed = true; }
+                else if (r.Piece == Piece.Anteroom && lounge && AreaOf(r) >= 30f) { r.Type = RoomType.Lounge; r.Typed = true; }
+                else if (r.Piece == Piece.Anteroom && office) { r.Type = RoomType.Office; r.Typed = true; }
+            }
+        }
+
         static void TypeStation(Ctx c, int f, List<Region> regions, System.Random rng)
         {
             var rooms = Typeable(regions);
