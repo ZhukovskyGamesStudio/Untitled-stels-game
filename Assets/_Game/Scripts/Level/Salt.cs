@@ -29,5 +29,7 @@ namespace Stealth.Level
         public const int DangerZones = 0xDA26, GreenTraps = 0xDA27;
         // which muddle a player wakes with in the nurse's bed
         public const int Muddle = 0x3D1E;
+        // which way a wall a driller broke looks (the ruin frame's variant)
+        public const int WallBreaks = 0xB4EA;
     }
 }

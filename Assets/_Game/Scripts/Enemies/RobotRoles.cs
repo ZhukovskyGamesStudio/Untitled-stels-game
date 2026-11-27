@@ -102,6 +102,22 @@ namespace Stealth.Enemies
             return -1;
         }
 
+        /// <summary>Work this high above its feet (metres) a repairman goes up the wall for.</summary>
+        public static bool Climbs(float height) => height > 1.2f;
+
+        /// <summary>Seconds a robot spends at its work once it is there (longer up a wall).</summary>
+        public static float WorkTime(bool climbing) => climbing ? 4f : 1.2f;
+
+        /// <summary>How far up the wall a climbing body is, <paramref name="t"/> 0 … 1 of the climb eased (pure): 0 on the floor, 1 at the top.</summary>
+        public static float ClimbEase(float t) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
+
+        /// <summary>
+        /// A driller breaks the wall ahead when the way round is much longer than the way through (or there is none):
+        /// <paramref name="straight"/> metres to where its prey is, <paramref name="path"/> metres by the floor.
+        /// </summary>
+        public static bool WorthBreaking(float straight, float path, bool noWay) =>
+            straight < 14f && (noWay || float.IsInfinity(path) || path > straight * 2f + 4f);
+
         /// <summary>Whom a shriek or a cloud reaches: within the radius on the same floor.</summary>
         public static bool Reaches(Vector3 from, Vector3 to, float radius) =>
             Mathf.Abs(to.y - from.y) <= Player.Hazards.Height && new Vector2(to.x - from.x, to.z - from.z).sqrMagnitude <= radius * radius;

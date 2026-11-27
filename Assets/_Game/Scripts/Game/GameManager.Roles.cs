@@ -16,7 +16,11 @@ namespace Stealth.Game
         /// <summary>Doors a driller broke: they stand open, no lock, nobody shuts them again.</summary>
         readonly HashSet<int> m_BrokenDoors = new();
 
-        void BeginHouseRolesServer() => m_BrokenDoors.Clear();
+        void BeginHouseRolesServer()
+        {
+            m_BrokenDoors.Clear();
+            VoiceHub.ForgetSpeechServer(); // a relay plays back only what was said in its own house
+        }
 
         /// <summary>Server: the warden at a door — shuts it if it stands open, else sets its hacked lock again. True if it set a lock.</summary>
         public bool WardenDoorServer(AutoDoor door)
@@ -38,6 +42,12 @@ namespace Stealth.Game
             if (m_IsServer && m_Opened.Remove(OpenKeys.Crawl(index))) OpenedVersion++;
         }
 
+        /// <summary>Server: the repairman screws a duct's ceiling grate shut again.</summary>
+        public void ShutGrateServer(int index)
+        {
+            if (m_IsServer && m_Opened.Remove(OpenKeys.Vent(index))) OpenedVersion++;
+        }
+
         /// <summary>Server: a driller breaks a door — unlocked and open from now on. True if it was shut or locked.</summary>
         public bool BreakDoorServer(AutoDoor door)
         {
@@ -52,18 +62,23 @@ namespace Stealth.Game
 
         /// <summary>
         /// Server: a relay calls for help in a teammate's name — the team sees a "help!" ping at the relay as if a player
-        /// had sent it (the lure). In the name of a player who is not standing next to it; alone — in nobody's (no ping).
+        /// had sent it (the lure). In the name of a player who is not standing next to it (further than <see cref="LureNear"/>);
+        /// alone — in nobody's (no ping). <paramref name="caller"/>: the player whose recorded words the relay plays — the
+        /// ping is in their name (<see cref="VoiceHub.LureServer"/>).
         /// </summary>
-        public void LureCallServer(Vector3 at, int roll)
+        public void LureCallServer(Vector3 at, int roll, ulong? caller = null)
         {
             if (!m_IsServer || Phase != RunPhase.Playing) return;
             var names = new List<PlayerController>();
             foreach (var p in PlayerController.All)
-                if (!p.Downed && Vector3.Distance(p.transform.position, at) > 6f) names.Add(p);
+                if (!p.Downed && Vector3.Distance(p.transform.position, at) > LureNear) names.Add(p);
             if (names.Count < 2) return; // (the one player who would see it knows they did not call)
-            var owner = names[Mathf.Abs(roll) % names.Count];
+            var owner = names.Find(p => p.ClientId == caller) ?? names[Mathf.Abs(roll) % names.Count];
             Link.BroadcastPing(owner.ClientId, PingKind.Help, at, 0);
         }
+
+        /// <summary>A relay never calls in the name (or the voice) of a player this close to it, metres: they would know.</summary>
+        public const float LureNear = 6f;
 
         /// <summary>Server: a player pressed E at a "crate" that is a mimic.</summary>
         void UseMimicServer(PlayerController player, Interactable thing)

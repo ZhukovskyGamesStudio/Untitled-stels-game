@@ -3,7 +3,7 @@ namespace Stealth
     /// <summary>What a key of the house's replicated state (<see cref="IWorldState.IsOpened"/>) is about.</summary>
     public enum OpenKind : byte
     {
-        Door = 1, Safe, Terminal, Storage, Crate, Med, Dryer, Console, Cage, Escape, HackSlot, Lights, Shaft, Vent, Crawl, Gate, Stage, Ajar, Hole, DoorSwung,
+        Door = 1, Safe, Terminal, Storage, Crate, Med, Dryer, Console, Cage, Escape, HackSlot, Lights, Shaft, Vent, Crawl, Gate, Stage, Ajar, Hole, DoorSwung, Wall,
     }
 
     /// <summary>The stages of a house's main job kept with the opened things (<see cref="OpenKind.Stage"/>).</summary>
@@ -51,6 +51,9 @@ namespace Stealth
         /// <summary>A hole the hammer knocked in floor <paramref name="floor"/>'s slab, its first cell (x, z) on the plan (its side: <see cref="Stealth.Items.CraftedSettings.HoleSize"/>).</summary>
         public static int Hole(int floor, int x, int z) => Of(OpenKind.Hole, (floor & 15) << 20 | (z & 1023) << 10 | (x & 1023));
         public static (int floor, int x, int z) HoleOf(int key) { int i = IndexOf(key); return (i >> 20 & 15, i & 1023, i >> 10 & 1023); }
+        /// <summary>A breach a driller knocked in a wall: the plan's wall and where on it (decimetres from its A end; Level.WallBreaks).</summary>
+        public static int WallBreak(int wall, float at) => Of(OpenKind.Wall, (wall & 8191) << 10 | (UnityEngine.Mathf.RoundToInt(at * 10f) & 1023));
+        public static (int wall, float at) WallBreakOf(int key) { int i = IndexOf(key); return (i >> 10 & 8191, (i & 1023) / 10f); }
         public static int Med(ulong client) => Of(OpenKind.Med, (int)(client % MaxIndex));
         public static int Dryer(int prop) => Of(OpenKind.Dryer, prop);
         /// <summary>A room whose lights a player switched (from how the house started).</summary>

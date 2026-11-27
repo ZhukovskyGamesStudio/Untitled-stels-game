@@ -54,6 +54,7 @@ namespace Stealth.Tests
             "LiftButton.Cab",                // a call button on a landing is not in the cab
             "AutoDoor.Number",               // only a flat's entry door carries its number
             "PropVariants.Frame",            // only shelves swap their books for a style's own model
+            "VoicePlayback.Owner",           // the relay's loudspeaker plays a voice that is nobody's own
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

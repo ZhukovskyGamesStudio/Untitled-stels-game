@@ -48,3 +48,8 @@ description: "Звук USG: откуда звуки (CC0-записи, recorded.
   голос в мире — `VoicePlayback` (ребёнок `Voice` префаба игрока: плоский клип × голос в `OnAudioFilterRead`, потом Low-pass/Echo/Reverb),
   маршрут — `VoiceHub` (сервер делает шум `NoiseSystem.EmitServer` по сырому уровню и пересылает), сеть — `Net/VoiceNet` (named messages, Unreliable);
   настройки — `Data/Config/Audio` → `Voice`, выбор игрока — `VoicePrefs` (вторая колонка страницы настроек), кнопка — `GameAction.PushToTalk` (CapsLock).
+- Ретранслятор (`LureRelay`) играет настоящие слова игроков: пока в доме есть ретранслятор (`VoiceHub.RememberServer`), сервер
+  держит в памяти последние секунды речи каждого (`VoiceMemory`, кадры как пришли; очищается в начале дома), на зов берёт 0.8–2.5 с
+  речи игрока дальше `GameManager.LureNear` (ping — от его имени), шлёт всем одним надёжным сообщением `stealth.voice.lure`
+  (`VoicePacket.WriteLure`), каждый пир играет его в `VoicePlayback` ретранслятора (без владельца, + high-pass и distortion — «динамик»).
+  Никто не говорил — старый синтетический `LureCall`. Числа — `RelayProfile` (SnippetMin/Max, RememberSeconds, ForgetAfter).

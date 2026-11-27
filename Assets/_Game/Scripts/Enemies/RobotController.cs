@@ -40,10 +40,12 @@ namespace Stealth.Enemies
         public ItemVisuals CargoVisuals;
 
         /// <summary>What it is doing (the replicated mode's low bits; the top bit: resting on its dock).</summary>
-        public RobotState State => (RobotState)(Mode & 0x7F);
+        public RobotState State => (RobotState)(Mode & 0x3F);
         /// <summary>Resting on its charging dock (every peer: the top bit of the replicated mode).</summary>
         public bool RestingShown => (Mode & 0x80) != 0;
-        byte ModeOf(RobotState s) => (byte)((byte)s | (m_Brain != null && m_Brain.Resting ? 0x80 : 0));
+        /// <summary>Up a wall at its work (the repairman at a high grille; every peer: a bit of the replicated mode).</summary>
+        public bool ClimbingShown => (Mode & 0x40) != 0;
+        byte ModeOf(RobotState s) => (byte)((byte)s | (m_Brain != null && m_Brain.Resting ? 0x80 : 0) | (m_Climbing ? 0x40 : 0));
         /// <summary>-1 = sees everyone; otherwise the ItemCatalog colour it reacts to.</summary>
         public sbyte ColorFilter => Variant;
 

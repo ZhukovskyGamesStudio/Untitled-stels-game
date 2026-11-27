@@ -126,6 +126,8 @@ namespace Stealth.EditorTools
             Img(R(panel, "Robot", TopRight, TopRight, new Vector2(-78, -7), new Vector2(22, 22)), Color.white, Icon("robot_guard")).preserveAspect = true;
             hud.ClockNext = Ink(R(panel, "Next", TopRight, TopRight, new Vector2(-12, -2), new Vector2(64, 32)), "3:00", 18, TextAnchor.MiddleRight, Face.Mono, UiPalette.InkSoft);
             hud.ClockCount = Ink(R(panel, "Count", TopRight, TopRight, new Vector2(-104, -6), new Vector2(36, 22)), "", 14, TextAnchor.MiddleRight, Face.Bold, UiPalette.Stamp);
+            // the danger zone the player stands in: a coloured tab on the card's left edge
+            hud.ZoneTab = Img(R(panel, "Zone", TopLeft, TopLeft, new Vector2(-6, -6), new Vector2(8, 38)), UiPalette.MarkGreen);
             hud.ClockBar = PaperBar(panel, "ToNext", BottomLeft, BottomLeft, new Vector2(10, 9), new Vector2(276, 8), UiPalette.MarkPink);
             // the marker over the bar's end: where the next robot is on the way
             var marker = R(panel, "Marker", BottomRight, Center, new Vector2(-14, 13), new Vector2(8, 8));

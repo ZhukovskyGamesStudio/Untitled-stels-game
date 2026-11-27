@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Stealth.Audio
@@ -62,6 +63,55 @@ namespace Stealth.Audio
             ulong id = 0;
             for (int i = 0; i < 8; i++) id |= (ulong)buffer[offset + i] << (8 * i);
             return id;
+        }
+
+        /// <summary>A relay's call: the relay's id, the frame count, then each frame (as it came) with its length in front.</summary>
+        public const int LureHeader = 10;
+
+        /// <summary>Bytes of a relay's call carrying these frames (<see cref="WriteLure"/>).</summary>
+        public static int LureSize(IReadOnlyList<ArraySegment<byte>> frames)
+        {
+            int n = LureHeader;
+            foreach (var f in frames) n += 2 + f.Count;
+            return n;
+        }
+
+        /// <summary>The server's message to every peer: play these recorded frames from relay <paramref name="relay"/>.</summary>
+        public static int WriteLure(byte[] buffer, ulong relay, IReadOnlyList<ArraySegment<byte>> frames)
+        {
+            for (int i = 0; i < 8; i++) buffer[i] = (byte)(relay >> (8 * i));
+            buffer[8] = (byte)frames.Count;
+            buffer[9] = (byte)(frames.Count >> 8);
+            int p = LureHeader;
+            foreach (var f in frames)
+            {
+                buffer[p] = (byte)f.Count;
+                buffer[p + 1] = (byte)(f.Count >> 8);
+                Buffer.BlockCopy(f.Array, f.Offset, buffer, p + 2, f.Count);
+                p += 2 + f.Count;
+            }
+            return p;
+        }
+
+        /// <summary>Reads a relay's call; the segments point into <paramref name="buffer"/>. False if it is broken.</summary>
+        public static bool ReadLure(byte[] buffer, int offset, int length, out ulong relay, List<ArraySegment<byte>> frames)
+        {
+            frames.Clear();
+            relay = 0;
+            if (length < LureHeader) return false;
+            relay = ReadSpeaker(buffer, offset);
+            int count = buffer[offset + 8] | buffer[offset + 9] << 8;
+            int p = offset + LureHeader, end = offset + length;
+            for (int i = 0; i < count; i++)
+            {
+                if (p + 2 > end) return false;
+                int n = buffer[p] | buffer[p + 1] << 8;
+                p += 2;
+                if (n > MaxSize || p + n > end) return false;
+                frames.Add(new ArraySegment<byte>(buffer, p, n));
+                p += n;
+            }
+            return true;
         }
 
         /// <summary>How far <paramref name="a"/> is ahead of <paramref name="b"/>, across the wrap (−32768 … 32767).</summary>

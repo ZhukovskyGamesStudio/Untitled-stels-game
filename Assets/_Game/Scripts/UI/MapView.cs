@@ -47,6 +47,8 @@ namespace Stealth.UI
             UiPalette.InkFaint.A(0.25f),     // Void (an atrium seen from above)
             UiPalette.NoteGreen.A(0.55f),    // Ground (the yard outside, seen up close in the gas)
             UiPalette.MarkGreen,             // ExitHatch (the way out: green, like its marker in the HUD)
+            UiPalette.MarkYellow.A(0.38f),   // ZoneYellow (a yellow room: guards, traps)
+            UiPalette.Stamp.A(0.32f),        // ZoneRed (a red room: the worst of the house)
         };
         static readonly Color Marked = UiPalette.Stamp;
 

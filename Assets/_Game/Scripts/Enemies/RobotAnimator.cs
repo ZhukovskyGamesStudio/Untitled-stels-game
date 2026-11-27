@@ -28,6 +28,11 @@ namespace Stealth.Enemies
         Vector3 m_Velocity;
         readonly List<Transform> m_Rotors = new();
         readonly List<Transform> m_Wheels = new();
+        /// <summary>Drills: they spin about the forward axis, fast while the robot is after someone.</summary>
+        readonly List<Transform> m_Drills = new();
+        float m_Climb;
+        /// <summary>How high a robot at work up a wall hangs, and how far it leans in to it, metres.</summary>
+        const float ClimbHeight = 1.5f, ClimbReach = 0.35f;
         readonly List<(Transform t, float phase)> m_Legs = new();
         Vector3 m_LastPos;
         float m_Speed, m_Phase;
@@ -59,7 +64,7 @@ namespace Stealth.Enemies
         }
 
         static bool IsMovingPart(string n) =>
-            n.StartsWith("AccentRotor") || n.StartsWith("AccentWheel") || (n.StartsWith("AccentLeg") && !IsJointedLeg(n)) || n.StartsWith("AccentHead");
+            n.StartsWith("AccentRotor") || n.StartsWith("AccentWheel") || n.StartsWith("AccentDrill") || (n.StartsWith("AccentLeg") && !IsJointedLeg(n)) || n.StartsWith("AccentHead");
 
         /// <summary>Thigh / shin of a leg that walks by inverse kinematics (<see cref="ProceduralLegs"/>), not by swinging.</summary>
         static bool IsJointedLeg(string n) => n.Contains(ProceduralLegs.UpperSuffix) || n.Contains(ProceduralLegs.LowerSuffix);
@@ -130,7 +135,8 @@ namespace Stealth.Enemies
                 else if (t.name.StartsWith("SensorMic")) m_Mics.Add((t, t.localRotation));
                 else if (t.name.StartsWith("SensorGround")) m_Probes.Add((t, t.localPosition));
                 if (!t.name.EndsWith(PivotSuffix)) continue;
-                if (t.name.StartsWith("AccentRotor")) m_Rotors.Add(t);
+                if (t.name.StartsWith("AccentDrill")) m_Drills.Add(t);
+                else if (t.name.StartsWith("AccentRotor")) m_Rotors.Add(t);
                 else if (t.name.StartsWith("AccentWheel")) m_Wheels.Add(t);
                 else if (t.name.StartsWith("AccentLeg") && !IsJointedLeg(t.name)) m_Legs.Add((t, m_Legs.Count % 2 == 0 ? 0f : Mathf.PI));
             }
@@ -179,6 +185,9 @@ namespace Stealth.Enemies
             float power = 1f - m_Slump; // a hacked robot winds down: rotors, wheels and legs stop
             foreach (var r in m_Rotors) r.Rotate(0f, RotorSpeed * dt * Mathf.Max(power, 0.05f), 0f, Space.Self);
             foreach (var w in m_Wheels) w.Rotate(m_Speed / 0.12f * Mathf.Rad2Deg * dt, 0f, 0f, Space.Self);
+            float drill = state is RobotState.Chase or RobotState.Alerted ? 1f : 0.18f;
+            foreach (var bit in m_Drills) bit.Rotate(0f, 0f, RotorSpeed * 0.6f * drill * dt * Mathf.Max(power, 0.02f), Space.Self);
+            m_Climb = Mathf.MoveTowards(m_Climb, m_Robot != null && m_Robot.ClimbingShown && !hacked ? 1f : 0f, dt * 0.9f);
             float swing = Mathf.Clamp01(m_Speed / 2f) * LegSwing;
             foreach (var (leg, phase) in m_Legs)
                 leg.localRotation = Quaternion.Euler(Mathf.Sin(m_Phase + phase) * swing, 0f, 0f);
@@ -197,6 +206,14 @@ namespace Stealth.Enemies
                     Mathf.Clamp(local.z * Lean / 5f, -Lean, Lean) - m_Recoil * 18f + m_Slump * 25f, 0f,
                     Mathf.Clamp(-local.x * Lean / 5f - m_TurnRate * 0.05f, -Lean, Lean));
                 Model.localPosition = m_ModelBase + Vector3.up * (Mathf.Sin(t * 2.2f) * 0.05f * power - m_Slump * 0.6f + m_Recoil * 0.15f);
+                return;
+            }
+            if (m_Climb > 0f)
+            {
+                // up the wall in front of it: the body rises and turns its belly to the wall (a repairman at a high grille)
+                float up = RoleRules.ClimbEase(m_Climb);
+                Model.localRotation = m_ModelRest * Quaternion.Euler(-88f * up, 0f, 0f);
+                Model.localPosition = m_ModelBase + new Vector3(0f, ClimbHeight * up, ClimbReach * up) + Vector3.up * (Mathf.Sin(t * 9f) * 0.01f * up);
                 return;
             }
             // Ground robots: lean into speed and turns, startle back when they spot someone, sag when hacked,

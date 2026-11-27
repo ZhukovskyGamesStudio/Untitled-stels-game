@@ -100,6 +100,8 @@ namespace Stealth.UI
         [Header("The house's clock")]
         [Tooltip("Its time card: from plain paper through the pink copy to a reddish sheet as extra robots come.")]
         public Image ClockPanel;
+        [Tooltip("A small tab on the clock's card in the colour of the danger zone the player stands in (green, yellow, red).")]
+        public Image ZoneTab;
         public Text ClockTime, ClockNext, ClockCount;
         [Tooltip("The frame rate and the frame's time (Settings: show FPS), top middle")]
         public Text FpsLabel;
@@ -321,6 +323,18 @@ namespace Stealth.UI
             if (ClockTime.text != time) ClockTime.text = time;
             if (ClockNext.text != at) ClockNext.text = at;
             if (ClockBar != null) ClockBar.Set(next < 0f ? 1f : Mathf.InverseLerp(prev, next, t), came > 0 ? UiPalette.Stamp.A(0.75f) : UiPalette.MarkPink);
+            if (ZoneTab != null)
+            {
+                var me = PlayerController.Local;
+                var layout = Stealth.Level.ActiveLevel.Layout;
+                bool inHouse = me != null && layout != null && layout.Zones != null && layout.RoomAt(me.transform.position + Vector3.up * 0.3f) != null;
+                Ui.Show(ZoneTab, inHouse);
+                if (inHouse)
+                {
+                    var zone = HudRules.ZoneColor(layout.ZoneAt(me.transform.position));
+                    if (ZoneTab.color != zone) ZoneTab.color = zone;
+                }
+            }
             if (ClockCount != null)
             {
                 string n = came > 0 ? "+" + came : "";

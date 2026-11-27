@@ -4,7 +4,7 @@ using static Stealth.Level.LevelMetrics;
 
 namespace Stealth.Level
 {
-    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void, Ground, ExitHatch }
+    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void, Ground, ExitHatch, ZoneYellow, ZoneRed }
 
     /// <summary>
     /// One rectangle of the map, x/y = world x/z in metres. <see cref="Angle"/> turns it (degrees, counter-clockwise)
@@ -82,6 +82,9 @@ namespace Stealth.Level
                 }
                 foreach (var (x0, x1, ins) in s_Rows) s_Open.Add((x0, x1, ty, ins));
             }
+            // the danger zones over the floor: the seen tiles of yellow and of red rooms, washed in their colour
+            Zone(map, floor, DangerZone.Yellow, MapPart.ZoneYellow, output);
+            Zone(map, floor, DangerZone.Red, MapPart.ZoneRed, output);
             if (plan != null && floor > 0)
                 for (int ty = 0; ty < map.Height; ty++)
                     for (int tx = 0; tx < map.Width; tx++)
@@ -133,6 +136,48 @@ namespace Stealth.Level
 
         /// <summary>The square of a staircase and its hole in the corner of its room.</summary>
         public static Rect StairArea(Stair s) => PlanGenerator.StairArea(s, 0f);
+
+        static readonly List<(int x0, int x1)> s_ZoneRows = new();
+        static readonly List<(int x0, int x1, int y0)> s_ZoneOpen = new();
+
+        /// <summary>The seen tiles of the rooms of one danger zone, merged into rectangles (as the floor's are).</summary>
+        static void Zone(ExplorationMap map, int floor, DangerZone zone, MapPart part, List<MapRect> output)
+        {
+            var l = map.Layout;
+            if (l == null || l.Zones == null || l.Plan == null) return;
+            const float t = ExplorationMap.Tile;
+            float y = LevelLayout.FloorY(floor);
+            s_ZoneOpen.Clear();
+            for (int ty = 0; ty <= map.Height; ty++)
+            {
+                s_ZoneRows.Clear();
+                if (ty < map.Height)
+                {
+                    int start = -1;
+                    for (int tx = 0; tx <= map.Width; tx++)
+                    {
+                        bool on = tx < map.Width && map.IsRevealed(floor, tx, ty);
+                        if (on)
+                        {
+                            var c = ExplorationMap.TileCenter(tx, ty);
+                            var room = l.Plan.RoomAt(new Vector3(c.x, y + 0.3f, c.y));
+                            on = room != null && l.ZoneOf(room.Id) == zone;
+                        }
+                        if (start >= 0 && !on) { s_ZoneRows.Add((start, tx)); start = -1; }
+                        if (on && start < 0) start = tx;
+                    }
+                }
+                for (int i = s_ZoneOpen.Count - 1; i >= 0; i--)
+                {
+                    var (x0, x1, y0) = s_ZoneOpen[i];
+                    if (s_ZoneRows.Remove((x0, x1))) continue;
+                    var min = ExplorationMap.TileMin(x0, y0);
+                    output.Add(new MapRect(part, new Rect(min.x, min.y, (x1 - x0) * t, (ty - y0) * t)));
+                    s_ZoneOpen.RemoveAt(i);
+                }
+                foreach (var (x0, x1) in s_ZoneRows) s_ZoneOpen.Add((x0, x1, ty));
+            }
+        }
 
         /// <summary>Whether anybody has seen any tile of this area of a floor.</summary>
         public static bool AnyRevealed(ExplorationMap map, int floor, Rect area)

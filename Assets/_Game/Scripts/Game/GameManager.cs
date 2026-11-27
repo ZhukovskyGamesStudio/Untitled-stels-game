@@ -660,6 +660,7 @@ namespace Stealth.Game
             RevealMap();
             _ = Book; // this run's recipes on every peer (a blueprint's worth reads them)
             UpdateHoles();
+            UpdateWallBreaks();
             PrepareNextHouse();
             UpdateDrive();
             EnsureHouseSewer();

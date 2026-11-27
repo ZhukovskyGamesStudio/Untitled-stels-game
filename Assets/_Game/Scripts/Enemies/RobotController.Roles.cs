@@ -116,7 +116,7 @@ namespace Stealth.Enemies
                     if (calm && RoleRules.Due(now, m_RoleAt, Traits.RolePeriod)) { m_RoleAt = now; return SeekGrille(); }
                     break;
                 case RobotRole.Driller:
-                    if (State is RobotState.Chase or RobotState.Investigate && RoleRules.Due(now, m_RoleAt, 0.4f)) { m_RoleAt = now; BreakDoors(); }
+                    if (State is RobotState.Chase or RobotState.Investigate && RoleRules.Due(now, m_RoleAt, 0.4f)) { m_RoleAt = now; BreakDoors(); BreakWall(); }
                     break;
                 case RobotRole.Maniac:
                     Stalk(now);
@@ -128,6 +128,8 @@ namespace Stealth.Enemies
         /// <summary>Server: walk to a spot, stand a moment, do the thing; given up after a while (a blocked way).</summary>
         void StartRoleErrand(Vector3 at, System.Action done)
         {
+            m_RoleErrandLook = at;
+            m_RoleWorkUntil = -1f;
             if (NavMesh.SamplePosition(at, out var hit, 1.5f, m_Agent.areaMask)) at = hit.position;
             m_RoleErrand = at;
             m_RoleErrandDone = done;
@@ -141,7 +143,16 @@ namespace Stealth.Enemies
             var flat = m_RoleErrand.Value - transform.position;
             flat.y = 0f;
             if (flat.magnitude > 1.3f && !Arrived) { Move(Traits.InvestigateSpeed); return true; }
+            // there: it works a moment (a repairman at a high grille goes up the wall to it), then the thing is done
             Stop();
+            Face(m_RoleErrandLook, dt);
+            if (m_RoleWorkUntil < 0f)
+            {
+                m_Climbing = RoleRules.Climbs(m_RoleErrandLook.y - Feet.y);
+                m_RoleWorkUntil = now + RoleRules.WorkTime(m_Climbing);
+                return true;
+            }
+            if (now < m_RoleWorkUntil) return true;
             var done = m_RoleErrandDone;
             EndRoleErrand();
             done?.Invoke();
@@ -154,11 +165,18 @@ namespace Stealth.Enemies
         {
             m_RoleErrand = null;
             m_RoleErrandDone = null;
+            m_RoleWorkUntil = -1f;
+            m_Climbing = false;
         }
+
+        bool m_Climbing;
+        float m_RoleWorkUntil = -1f;
+        Vector3 m_RoleErrandLook;
 
         static readonly List<Vector3> s_Spots = new();
         static readonly List<AutoDoor> s_Doors = new();
         static readonly List<VentGrille> s_Grilles = new();
+        static readonly List<VentGrate> s_Grates = new();
 
         /// <summary>Server, the warden: the nearest door with something to put right — walk over, shut it, set its lock again.</summary>
         bool SeekDoor()
@@ -197,16 +215,33 @@ namespace Stealth.Enemies
             if (gm == null) return false;
             s_Spots.Clear();
             s_Grilles.Clear();
+            s_Grates.Clear();
             foreach (var it in Interactable.All)
                 if (it is VentGrille g && g.Open)
                 {
                     s_Grilles.Add(g);
-                    s_Spots.Add(g.transform.position);
+                    s_Grates.Add(null);
+                    s_Spots.Add(new Vector3(g.transform.position.x, Feet.y, g.transform.position.z));
+                }
+            // the duct grates in the ceiling players unscrewed: it goes up the wall under one and screws it shut again
+            foreach (var g in VentGrate.Grates)
+                if (g != null && g.Closed && g.Open)
+                {
+                    s_Grilles.Add(null);
+                    s_Grates.Add(g);
+                    s_Spots.Add(new Vector3(g.transform.position.x, Feet.y, g.transform.position.z));
                 }
             int i = RoleRules.Nearest(transform.position, s_Spots, Traits.RoleRadius);
             if (i < 0) return false;
             var grille = s_Grilles[i];
-            StartRoleErrand(grille.transform.position, () => { if (grille != null) gm.ShutGrilleServer(grille.Index); });
+            var grate = s_Grates[i];
+            var target = grille != null ? grille.Point : grate.transform.position;
+            StartRoleErrand(s_Spots[i], () =>
+            {
+                if (grille != null) gm.ShutGrilleServer(grille.Index);
+                else if (grate != null) gm.ShutGrateServer(grate.Index);
+            });
+            m_RoleErrandLook = target; // (how high the work is: it climbs to a high one)
             return true;
         }
 
@@ -224,6 +259,24 @@ namespace Stealth.Enemies
                 if (to.magnitude > Traits.RoleRadius || Vector3.Dot(to.normalized, transform.forward) < 0.3f) continue;
                 if (gm.BreakDoorServer(d)) Pulse(PulseBreak);
             }
+        }
+
+        /// <summary>
+        /// Server, the driller: after someone, with a wall between it and where they are and only a long way round — it
+        /// drills straight through (a breach, <see cref="WallBreaks"/>), so many times a house (<see cref="RobotTraits.RoleLimit"/>).
+        /// </summary>
+        void BreakWall()
+        {
+            var gm = GameManager.Instance;
+            var layout = ActiveLevel.Layout;
+            if (gm == null || layout == null || State != RobotState.Chase || m_Agent.pathPending) return;
+            if (Traits.RoleLimit > 0 && m_RoleUses >= Traits.RoleLimit) return;
+            var goal = m_Brain.LastKnown;
+            if (!RoleRules.WorthBreaking(Vector3.Distance(Feet, goal), m_Agent.remainingDistance, m_Agent.pathStatus != NavMeshPathStatus.PathComplete)) return;
+            if (!WallBreaks.Ahead(layout, Feet, goal, Traits.RoleRadius + 0.8f, out int wall, out float at)) return;
+            if (WallBreaks.OpenAt(layout.Plan, wall, at) || !gm.BreakWallServer(wall, at)) return;
+            m_RoleUses++;
+            Pulse(PulseBreak);
         }
 
         /// <summary>

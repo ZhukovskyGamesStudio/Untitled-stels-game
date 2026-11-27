@@ -29,9 +29,24 @@ namespace Stealth.EditorTools
         {
             const string fx = "FX";
             Mat(fx, "Goo", new Color(0.36f, 0.62f, 0.22f), smoothness: 0.85f);
-            Translucent(Mat(fx, "SmokePuff", new Color(0.55f, 0.56f, 0.58f, 0.3f), unlit: true));
-            Translucent(Mat(fx, "GasPuff", new Color(0.55f, 0.85f, 0.3f, 0.22f), unlit: true));
             Mat(fx, "Tracer", new Color(1.6f, 1.3f, 0.5f), unlit: true);
+        }
+
+        /// <summary>
+        /// The material of a cloud's puffs: lit particles (the room's lamps light the smoke: in a dark room it is dark),
+        /// alpha blended, the puff sheet as its picture; the colour comes from each particle.
+        /// </summary>
+        static Material CloudMaterial(string name)
+        {
+            var mat = LitAsset($"{MaterialsDir}/FX/{name}.mat");
+            var particles = Shader.Find("Universal Render Pipeline/Particles/Lit");
+            if (particles != null) mat.shader = particles;
+            mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>($"{SpritesDir}/SmokePuff.png"));
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetFloat("_Smoothness", 0f);
+            mat.SetFloat("_Metallic", 0f);
+            Translucent(mat);
+            return mat;
         }
 
         /// <summary>A patch a robot leaves: a puddle (the model scaled to its radius) or a cloud (particles).</summary>
@@ -66,30 +81,70 @@ namespace Stealth.EditorTools
                     view.Body = body.transform;
                     return go;
                 }
-                var cloud = Child(go.transform, "Cloud", Vector3.up * 0.9f);
+                // a cloud of billowing puffs (Tools/Art/generate_smoke.py: four shapes on a sheet), lit by the room's lamps:
+                // born small and thin, each swells, turns slowly, drifts on a gentle turbulence and thins out; the smoke
+                // rises a little and rolls along the ceiling, the gas hugs the floor
+                bool smokeKind = kind == HazardKind.Smoke;
+                var cloud = Child(go.transform, "Cloud", Vector3.up * (smokeKind ? 0.9f : 0.5f));
                 var ps = cloud.AddComponent<ParticleSystem>();
                 var main = ps.main;
-                main.startLifetime = new ParticleSystem.MinMaxCurve(2.5f, 4f);
-                main.startSpeed = new ParticleSystem.MinMaxCurve(0.05f, 0.35f);
-                main.startSize = new ParticleSystem.MinMaxCurve(1.2f, 2.4f);
+                main.duration = 5f;
+                main.loop = true;
+                main.startLifetime = new ParticleSystem.MinMaxCurve(4f, 6.5f);
+                main.startSpeed = new ParticleSystem.MinMaxCurve(0.05f, 0.3f);
+                main.startSize = new ParticleSystem.MinMaxCurve(1.6f, 3f);
                 main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-                main.maxParticles = 160;
+                main.startColor = smokeKind
+                    ? new ParticleSystem.MinMaxGradient(new Color(0.62f, 0.63f, 0.66f, 0.55f), new Color(0.42f, 0.43f, 0.46f, 0.7f))
+                    : new ParticleSystem.MinMaxGradient(new Color(0.62f, 0.9f, 0.36f, 0.4f), new Color(0.45f, 0.75f, 0.25f, 0.55f));
+                main.gravityModifier = smokeKind ? -0.012f : 0.006f;
+                main.maxParticles = 220;
                 main.simulationSpace = ParticleSystemSimulationSpace.World;
                 main.playOnAwake = true;
+                main.prewarm = false;
                 var emission = ps.emission;
-                emission.rateOverTime = kind == HazardKind.Smoke ? 26f : 18f;
+                emission.rateOverTime = smokeKind ? 22f : 16f;
+                emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)(smokeKind ? 26 : 18)) }); // the puff it starts with
                 var shape = ps.shape;
                 shape.shapeType = ParticleSystemShapeType.Sphere;
                 shape.radius = 2f;
+                shape.radiusThickness = 1f;
+                shape.scale = new Vector3(1f, smokeKind ? 0.55f : 0.3f, 1f); // a low dome, not a ball through the floor
                 var fade = ps.colorOverLifetime;
                 fade.enabled = true;
                 var gradient = new Gradient();
-                gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                    new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.25f), new GradientAlphaKey(0f, 1f) });
+                gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.85f, 0.85f, 0.85f), 1f) },
+                    new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.18f), new GradientAlphaKey(0.8f, 0.6f), new GradientAlphaKey(0f, 1f) });
                 fade.color = gradient;
+                var grow = ps.sizeOverLifetime;
+                grow.enabled = true;
+                grow.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.45f, 0f, 1.6f), new Keyframe(0.35f, 0.9f), new Keyframe(1f, 1.35f)));
+                var spin = ps.rotationOverLifetime;
+                spin.enabled = true;
+                spin.z = new ParticleSystem.MinMaxCurve(-0.35f, 0.35f);
+                var drift = ps.noise;
+                drift.enabled = true;
+                drift.strength = 0.22f;
+                drift.frequency = 0.35f;
+                drift.scrollSpeed = 0.15f;
+                drift.damping = true;
+                var slow = ps.limitVelocityOverLifetime;
+                slow.enabled = true;
+                slow.limit = 0.45f;
+                slow.dampen = 0.2f;
+                var sheet = ps.textureSheetAnimation;
+                sheet.enabled = true;
+                sheet.numTilesX = 2;
+                sheet.numTilesY = 2;
+                sheet.animation = ParticleSystemAnimationType.WholeSheet;
+                sheet.frameOverTime = new ParticleSystem.MinMaxCurve(0f); // one shape per puff, picked at birth
+                sheet.startFrame = new ParticleSystem.MinMaxCurve(0f, 3.999f / 4f);
                 var pr = cloud.GetComponent<ParticleSystemRenderer>();
-                pr.sharedMaterial = M(kind == HazardKind.Smoke ? "SmokePuff" : "GasPuff");
+                pr.renderMode = ParticleSystemRenderMode.Billboard;
+                pr.sortMode = ParticleSystemSortMode.Distance;
+                pr.sharedMaterial = CloudMaterial(smokeKind ? "SmokeCloud" : "GasCloud");
                 pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                pr.receiveShadows = true;
                 view.Cloud = ps;
                 return go;
             }).GetComponent<HazardView>();
@@ -227,7 +282,7 @@ namespace Stealth.EditorTools
                 s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.6f; s.HearingMultiplier = 0.6f;
                 t.CanUseStairs = false;
                 t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.4f; t.ChaseSpeed = 3.4f; t.AttackRange = 1.9f;
-                t.Role = RobotRole.Driller; t.RoleRadius = 2.2f; // how far ahead a door is broken
+                t.Role = RobotRole.Driller; t.RoleRadius = 2.2f; t.RoleLimit = 4; // how far ahead a door or a wall is broken; walls per house
             }));
             robot(RobotKind.Exterminator, RobotPrefabs + "/RobotExterminator.prefab", () =>
             {
@@ -258,6 +313,13 @@ namespace Stealth.EditorTools
             robot(RobotKind.Relay, SensorPrefabs + "/SensorRelay.prefab", () => Device<LureRelay>("SensorRelay", ModelOr("robot_relay", "sensor_lidar"), "TurretBody", false, false, (root, r) =>
             {
                 r.Profile = Profile<RelayProfile>("SensorRelay", p => p.ForgetRate = 1f);
+                // the loudspeaker plays a teammate's recorded words: a player's voice, made tinny (no lows, a little grit)
+                r.Voice = AddVoice(root.transform);
+                r.Voice.transform.localPosition = r.Point.localPosition;
+                var tinny = r.Voice.gameObject.AddComponent<AudioHighPassFilter>();
+                tinny.cutoffFrequency = 650f;
+                tinny.highpassResonanceQ = 1.6f;
+                r.Voice.gameObject.AddComponent<AudioDistortionFilter>().distortionLevel = 0.3f;
             }));
         }
     }

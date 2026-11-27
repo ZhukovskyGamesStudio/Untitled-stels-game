@@ -64,6 +64,18 @@ namespace Stealth.UI
     }
 
     /// <summary>The glyph in the middle of the screen: a dot, or what the thing in front of you is for.</summary>
+    /// <summary>Small rules of the HUD (pure).</summary>
+    public static class HudRules
+    {
+        /// <summary>The colour of a danger zone on the HUD and the map: green, yellow, red.</summary>
+        public static Color ZoneColor(Level.DangerZone zone) => zone switch
+        {
+            Level.DangerZone.Red => UiPalette.Stamp,
+            Level.DangerZone.Yellow => UiPalette.MarkYellow,
+            _ => UiPalette.MarkGreen,
+        };
+    }
+
     /// <summary>What a knocked-out player reads on the screen (pure): where they are held.</summary>
     public static class DownedRules
     {

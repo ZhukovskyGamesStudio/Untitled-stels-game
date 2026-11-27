@@ -9,12 +9,14 @@ namespace Stealth.Net
     /// <summary>
     /// Voice frames over the session's transport (Steam or UDP) as unreliable named messages: a lost frame is better
     /// rebuilt by the codec than resent late. Client → server "stealth.voice.up", server → clients "stealth.voice.down"
-    /// (<see cref="VoiceHub"/> decides what to do with them).
+    /// (<see cref="VoiceHub"/> decides what to do with them). A relay's call — a teammate's recorded words for every peer to
+    /// play from the relay — is one reliable message "stealth.voice.lure" (a couple of seconds of frames, sent rarely).
     /// </summary>
     public sealed class VoiceNet : IVoiceTransport
     {
         const string Up = "stealth.voice.up";
         const string Down = "stealth.voice.down";
+        const string Lure = "stealth.voice.lure";
 
         readonly NetworkManager m_Manager;
         readonly byte[] m_In = new byte[VoicePacket.MaxSize];
@@ -38,8 +40,13 @@ namespace Stealth.Net
             if (cm == null) return;
             cm.UnregisterNamedMessageHandler(Up);
             cm.UnregisterNamedMessageHandler(Down);
+            cm.UnregisterNamedMessageHandler(Lure);
             if (m_Manager.IsServer) cm.RegisterNamedMessageHandler(Up, OnUp);
-            else cm.RegisterNamedMessageHandler(Down, OnDown);
+            else
+            {
+                cm.RegisterNamedMessageHandler(Down, OnDown);
+                cm.RegisterNamedMessageHandler(Lure, OnLure);
+            }
             VoiceHub.Transport = this;
             VoiceHub.Clear();
         }
@@ -52,6 +59,7 @@ namespace Stealth.Net
             if (cm == null) return;
             cm.UnregisterNamedMessageHandler(Up);
             cm.UnregisterNamedMessageHandler(Down);
+            cm.UnregisterNamedMessageHandler(Lure);
         }
 
         int Read(FastBufferReader reader)
@@ -76,6 +84,16 @@ namespace Stealth.Net
             if (n > 0) VoiceHub.ReceiveRelay(m_In, 0, n);
         }
 
+        void OnLure(ulong sender, FastBufferReader reader)
+        {
+            if (sender != NetworkManager.ServerClientId) return;
+            int n = reader.Length - reader.Position;
+            if (n <= 0) return;
+            var buffer = new byte[n]; // rare (a relay's call), bigger than a frame
+            reader.ReadBytesSafe(ref buffer, n);
+            VoiceHub.ReceiveLure(buffer, 0, n);
+        }
+
         public void ToServer(byte[] frame, int length)
         {
             if (!m_Manager.IsConnectedClient) return;
@@ -94,6 +112,18 @@ namespace Stealth.Net
             using var w = new FastBufferWriter(length, Allocator.Temp);
             w.WriteBytesSafe(relay, length);
             m_Manager.CustomMessagingManager.SendNamedMessage(Down, m_Targets, w, NetworkDelivery.Unreliable);
+        }
+
+        public void LureToClients(byte[] message, int length)
+        {
+            if (!m_Manager.IsServer) return;
+            m_Targets.Clear();
+            foreach (ulong id in m_Manager.ConnectedClientsIds)
+                if (id != NetworkManager.ServerClientId) m_Targets.Add(id);
+            if (m_Targets.Count == 0) return;
+            using var w = new FastBufferWriter(length, Allocator.Temp);
+            w.WriteBytesSafe(message, length);
+            m_Manager.CustomMessagingManager.SendNamedMessage(Lure, m_Targets, w, NetworkDelivery.ReliableFragmentedSequenced);
         }
     }
 }
