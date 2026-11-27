@@ -51,6 +51,13 @@ namespace Stealth.Level
             (m_Links[b] ??= new List<(int, int)>()).Add((a, opening));
         }
 
+        /// <summary>The rooms one step from <paramref name="room"/> (a room linked twice is listed twice).</summary>
+        public IEnumerable<int> Neighbours(int room)
+        {
+            if (room < 0 || room >= m_Links.Length || m_Links[room] == null) yield break;
+            foreach (var (n, _) in m_Links[room]) yield return n;
+        }
+
         /// <summary>Steps from <paramref name="start"/> per room (−1: not reached), not through <paramref name="skip"/> nor into <paramref name="closed"/>.</summary>
         public int[] Steps(int start, int skip = -1, ICollection<int> closed = null)
         {

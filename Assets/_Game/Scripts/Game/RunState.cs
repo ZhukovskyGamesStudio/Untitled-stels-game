@@ -82,6 +82,10 @@ namespace Stealth.Game
             return new ReinforcementClock(ReinforceFirst * slower, ReinforceSecond * slower, ReinforceEvery * slower, ReinforceMax);
         }
 
+        [Header("Danger")]
+        [Tooltip("The run's danger: what moves a house's clock forward, what the next house starts with, who comes when.")]
+        public EscalationSettings Escalation = new();
+
         [Header("Alarms")]
         [Tooltip("Seconds an alarm lasts (red lights, robots come running).")]
         public float AlarmDuration = 6f;

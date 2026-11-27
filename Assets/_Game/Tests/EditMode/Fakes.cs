@@ -20,7 +20,16 @@ namespace Stealth.Tests
         public int Hits;
 
         public bool Carries(int color) => color == CarriedColor;
-        public void HitServer(Vector3 source) => Hits++;
+        public Stealth.Player.DownCause LastCause;
+        /// <summary>A hit puts it down (one hit and you lie), as in the game.</summary>
+        public bool FallsWhenHit;
+        public bool CanBeCarried { get; set; }
+        public void HitServer(Vector3 source, Stealth.Player.DownCause cause = Stealth.Player.DownCause.Servant)
+        {
+            Hits++;
+            LastCause = cause;
+            if (FallsWhenHit) { IsDown = true; CanBeCarried = true; }
+        }
     }
 
     /// <summary>Records what a <see cref="RobotBrain"/> asks its body to do.</summary>
@@ -82,6 +91,7 @@ namespace Stealth.Tests
         public void SendRevive(PlayerController target) => Revives.Add(target);
         public int GetUps;
         public void SendGetUp() => GetUps++;
+        public void SendStruggle() { }
         public void SendHack(Detector target) => Hacks.Add(target);
         public readonly List<(Detector target, int terminal)> RemoteHacks = new();
         public void SendRemoteHack(Detector target, int terminal) => RemoteHacks.Add((target, terminal));

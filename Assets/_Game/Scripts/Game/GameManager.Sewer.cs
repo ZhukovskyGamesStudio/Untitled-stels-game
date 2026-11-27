@@ -227,7 +227,9 @@ namespace Stealth.Game
         bool LeaveHouseServer()
         {
             int down = PlayerController.All.Count(p => p.KnockedOut);
+            float clock = HouseClock;
             if (!m_Run.EnterSewer(down)) return false;
+            m_CarriedDanger = Escalation.Carry(clock, m_Run.Settings.Escalation);
             int lost = LoadCarServer();
             foreach (var p in PlayerController.All)
             {

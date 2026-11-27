@@ -85,6 +85,10 @@ namespace Stealth.Enemies
         protected ulong TargetClient => m_State.Target;
 
         public Vector3 Position => Point != null ? Point.position : transform.position + Vector3.up;
+        /// <summary>A servant of the machine (alarms, radio) or a renegade on its own (<see cref="RobotRoster.FactionOf"/>).</summary>
+        public Faction Faction => RobotRoster.FactionOf(Kind);
+        /// <summary>Whose hit this robot's is: a servant's victim is carried to prison, a renegade's is its own business.</summary>
+        public Stealth.Player.DownCause Cause => Faction == Stealth.Level.Faction.Renegade ? Stealth.Player.DownCause.Renegade : Stealth.Player.DownCause.Servant;
         public string DisplayName => RobotInfo.Name(Kind);
         public string SensesDescription => RobotInfo.Senses(Kind);
 

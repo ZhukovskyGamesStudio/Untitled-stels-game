@@ -7,9 +7,21 @@ namespace Stealth.Tests
     public class PlayerRulesTests
     {
         [Test]
-        public void EveryHitKnocksYouDownWithHpLeftYouGetUpYourself()
+        public void OneHitAndYouLieUntilATeammateComes()
         {
             var h = HealthState.Full(0f);
+            Assert.IsTrue(h.TryHit(4f));
+            Assert.IsTrue(h.KnockedOut, "one hit: out");
+            Assert.IsFalse(h.CanGetUp(60f), "nobody gets up alone");
+            Assert.IsFalse(h.GetUp(60f));
+            h.Revive(70f);
+            Assert.IsFalse(h.Downed, "a teammate brings you round");
+        }
+
+        [Test]
+        public void WithTwoHitPointsYouGetUpYourselfOnce()
+        {
+            var h = HealthState.Full(0f, new HealthSettings { OneHitDown = false });
             Assert.IsFalse(h.TryHit(1f), "invulnerable right after the level starts");
             Assert.IsTrue(h.TryHit(4f));
             Assert.AreEqual(1, h.Hp);

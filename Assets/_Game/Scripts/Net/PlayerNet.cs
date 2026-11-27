@@ -25,6 +25,15 @@ namespace Stealth.Net
         /// <summary>The double espresso's end (server time) and the gear's flags (PlayerController.GearFlags: the hammer's tired arms).</summary>
         readonly NetworkVariable<double> m_Ram = new();
         readonly NetworkVariable<byte> m_GearFlags = new();
+        /// <summary>Knocked out and held (PlayerController.Captive): where, by which robot, at which spot.</summary>
+        readonly NetworkVariable<byte> m_Captive = new();
+        readonly NetworkVariable<ulong> m_Captor = new();
+        readonly NetworkVariable<Vector3> m_CaptiveSpot = new();
+        /// <summary>Ailments (PlayerController.Ailments): a net, a stun's end, the muddled head and its end (server time).</summary>
+        readonly NetworkVariable<bool> m_Netted = new();
+        readonly NetworkVariable<double> m_StunUntil = new();
+        readonly NetworkVariable<byte> m_Muddle = new();
+        readonly NetworkVariable<double> m_MuddleUntil = new();
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         /// <summary>The head's turn off the held body (the ladder, a seat), degrees (PlayerController.LookYaw).</summary>
@@ -57,6 +66,13 @@ namespace Stealth.Net
             m_Loadout.OnValueChanged += (_, _) => Pull();
             m_Ram.OnValueChanged += (_, _) => Pull();
             m_GearFlags.OnValueChanged += (_, _) => Pull();
+            m_Captive.OnValueChanged += (_, _) => Pull();
+            m_Captor.OnValueChanged += (_, _) => Pull();
+            m_CaptiveSpot.OnValueChanged += (_, _) => Pull();
+            m_Netted.OnValueChanged += (_, _) => Pull();
+            m_StunUntil.OnValueChanged += (_, _) => Pull();
+            m_Muddle.OnValueChanged += (_, _) => Pull();
+            m_MuddleUntil.OnValueChanged += (_, _) => Pull();
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
             m_LookYaw.OnValueChanged += (_, _) => Pull();
@@ -89,6 +105,13 @@ namespace Stealth.Net
                 NetSync.Set(m_Loadout, m_Player.LoadoutPacked);
                 NetSync.Set(m_Ram, m_Player.RamUntil);
                 NetSync.Set(m_GearFlags, m_Player.GearFlags);
+                NetSync.Set(m_Captive, (byte)m_Player.Captive);
+                NetSync.Set(m_Captor, m_Player.CaptorId);
+                NetSync.Set(m_CaptiveSpot, m_Player.CaptiveSpot);
+                NetSync.Set(m_Netted, m_Player.Netted);
+                NetSync.Set(m_StunUntil, m_Player.StunnedUntil);
+                NetSync.Set(m_Muddle, (byte)m_Player.Muddled);
+                NetSync.Set(m_MuddleUntil, m_Player.MuddledUntil);
             }
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
@@ -112,6 +135,8 @@ namespace Stealth.Net
             {
                 m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value, m_Hatch.Value, m_Flashlight.Value);
                 m_Player.ApplyGear(m_Coffee.Value, m_Loadout.Value, m_Ram.Value, m_GearFlags.Value);
+                m_Player.ApplyCaptivity((CaptiveKind)m_Captive.Value, m_Captor.Value, m_CaptiveSpot.Value);
+                m_Player.ApplyAilments(m_Netted.Value, m_StunUntil.Value, (Muddle)m_Muddle.Value, m_MuddleUntil.Value);
             }
             if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString(), (BodyPose)m_Pose.Value, m_LookYaw.Value);
         }
@@ -135,6 +160,11 @@ namespace Stealth.Net
 
         [Rpc(SendTo.Server)]
         void GetUpRpc() => m_Player.OnGetUpRequest();
+
+        public void SendStruggle() => StruggleRpc();
+
+        [Rpc(SendTo.Server)]
+        void StruggleRpc() => m_Player.OnStruggleRequest();
         public void SendHack(Detector target) => HackRpc(target.GetComponent<NetworkObject>());
         public void SendRemoteHack(Detector target, int terminal) => RemoteHackRpc(target.GetComponent<NetworkObject>(), terminal);
 

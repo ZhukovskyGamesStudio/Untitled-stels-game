@@ -16,11 +16,14 @@ namespace Stealth.Player
         public float GetUpDelay = 1.2f;
         [Tooltip("Invulnerability after getting up.")]
         public float GetUpGrace = 1f;
+        [Tooltip("One hit and you lie until a teammate brings you round. Off: two hit points — the first knock-down you get up from yourself.")]
+        public bool OneHitDown = true;
     }
 
     /// <summary>
-    /// Server-side health rules (pure, unit tested): 2 HP. Every hit knocks you down — robots leave a lying player alone.
-    /// With HP left you get up yourself (after <see cref="HealthSettings.GetUpDelay"/>); at 0 HP a teammate must lift you.
+    /// Server-side health rules (pure, unit tested). Every hit knocks you down — robots do not hit a lying player. By default
+    /// one hit is enough (<see cref="HealthSettings.OneHitDown"/>): you lie until a teammate brings you round. With the
+    /// setting off there are 2 HP: with HP left you get up yourself (after <see cref="HealthSettings.GetUpDelay"/>).
     /// A short invulnerability after every hit so that one robot cannot finish you in the same second.
     /// </summary>
     public struct HealthState
@@ -51,7 +54,7 @@ namespace Stealth.Player
         {
             if (Downed || now < InvulnerableUntil) return false;
             InvulnerableUntil = now + S.HitGrace;
-            Hp = Mathf.Max(0, Hp - 1);
+            Hp = S.OneHitDown ? 0 : Mathf.Max(0, Hp - 1);
             Downed = true;
             DownedAt = now;
             return true;

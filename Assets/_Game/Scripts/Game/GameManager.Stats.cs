@@ -32,6 +32,9 @@ namespace Stealth.Game
         {
             if (!m_IsServer || player == null || Phase != RunPhase.Playing || Stealth.Level.ActiveLevel.Layout == null) return;
             m_Stats.Add(player.ClientId, kind, amount);
+            // what the house notices moves its clock forward (the run's danger)
+            if (kind == StatKind.Hacks) RaiseDangerServer(DangerEvent.Hack);
+            else if (kind == StatKind.Downs) RaiseDangerServer(DangerEvent.Down);
         }
 
         public void NoteFallServer(PlayerController player) => NoteServer(player, StatKind.Falls);

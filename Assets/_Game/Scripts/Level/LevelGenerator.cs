@@ -368,6 +368,9 @@ namespace Stealth.Level
 
         [Header("Who")]
         public RosterSettings Roster = new();
+
+        [Header("Danger zones")]
+        public DangerSettings Danger = new();
     }
 
     /// <summary>
@@ -436,6 +439,7 @@ namespace Stealth.Level
             SpecialRooms,    // the main job, the storage room, the control room, the charging room
             Ducts,           // the crawl ducts over the ceilings and the ways up to their grates
             Furnish,         // patrol points kept free, every room furnished, then walkable
+            Zones,           // every room green, yellow or red (the way out never red)
             Guards,          // guards, devices, lasers, terminals (or the quiet house's own doors)
             Extras,          // key doors, crates, the point of interest, the main job's finish, the shelter map
             DoorKinds,       // every door's kind, its way and hinges, round the furniture now there
@@ -643,6 +647,9 @@ namespace Stealth.Level
                 OwnDoors(l); // a quiet house (the rooms test) still has its flats' and bathrooms' doors
             }
         }
+
+        /// <summary>The danger zones: who stands where, where the traps and the best loot are (<see cref="DangerZones"/>).</summary>
+        static void Zones(House h) => DangerZones.Assign(h.L, h.Security.Danger);
 
         /// <summary>The storage room's finish, key doors, crates, the point of interest, the main job's finish, the shelter map.</summary>
         static void Extras(House h)
@@ -1172,35 +1179,55 @@ namespace Stealth.Level
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
             {
+                // the house that introduces a kind shows it, in a room dangerous enough for it
+                bool fresh = i < freshRobots.Count && RobotRoster.HouseScale(freshRobots[i], l.Kind, s.Roster.ByHouse) > 0f;
+                var rooms = fresh ? open.FindAll(c => l.ZoneOf(c.Id) >= RobotRoster.ZoneOf(freshRobots[i])) : open;
+                if (rooms.Count == 0) rooms = open;
                 // Every floor gets at least one robot, then they spread (bigger rooms more likely; nobody is shut in the vault).
                 PlanRoom room;
                 if (i < l.Floors)
                 {
-                    var onFloor = open.FindAll(c => c.Floor == i);
-                    room = onFloor.Count > 0 ? Weighted(onFloor, rng, l, s.DeepRoomWeight) : open[rng.Next(open.Count)];
+                    var onFloor = rooms.FindAll(c => c.Floor == i);
+                    room = onFloor.Count > 0 ? Weighted(onFloor, rng, l, s.DeepRoomWeight) : rooms[rng.Next(rooms.Count)];
                 }
-                else room = Weighted(open, rng, l, s.DeepRoomWeight);
+                else room = Weighted(rooms, rng, l, s.DeepRoomWeight);
                 var pos = SpotIn(l, room, rng, 1.2f);
                 if (room.Floor == 0 && Vector3.Distance(pos, l.HatchPosition) < MinDeviceDistanceToHatch) pos = room.Center;
-                var kind = RobotRoster.PickRobot(table, level, rng);
-                if (i < freshRobots.Count) kind = freshRobots[i]; // the house that introduces a kind shows it
+                // who works in a room is a matter of its zone: staff in the green ones, guards from the yellow, the worst in the red
+                var zone = l.ZoneOf(room.Id);
+                RobotKind Pick() => RobotRoster.PickRobot(table, level, rng, zone, l.Kind, s.Roster, s.Danger.OwnZoneWeight);
+                var kind = fresh ? freshRobots[i] : Pick();
                 // workers haul loot to the storage room: no storage room, no workers
-                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = RobotRoster.PickRobot(table, level, rng);
-                if (kind == RobotKind.Worker && l.StorageRoom < 0) kind = RobotKind.Guard;
+                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = Pick();
+                if (kind == RobotKind.Worker && l.StorageRoom < 0) kind = zone == DangerZone.Green ? RobotKind.Listener : RobotKind.Guard;
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
             StorageWorkers(l, rng, s, open, storageWorkers, freshRobots.Count);
             DockGuards(l, s);
+            Prison.Plan(l); // where the guards take whoever they knock out
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();
+            var calmDoors = new List<Vector3>();
+            var greenTraps = new System.Random(LevelRandom.Mix(l.Seed, Salt.GreenTraps, 0));
             for (int i = 0; i < l.Doorways.Count; i++)
             {
                 var d = l.Doorways[i];
                 // (the paint booth's: its big door, nothing in the way; a flat's entry, a bathroom…: their doors, below)
                 if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway && !DoorRules.Always(l, d))
+                {
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
+                    if (DangerZones.Of(l, d) == DangerZone.Green && greenTraps.NextDouble() >= s.Danger.GreenTraps) calmDoors.Add(d.Position);
+                }
             }
+            // a doorway between green rooms: no laser, no plate (a door it may still have)
+            bool Calm(Vector3 p)
+            {
+                foreach (var c in calmDoors) if ((c - p).sqrMagnitude < 0.01f) return true;
+                return false;
+            }
+            // a room for a device or a camera: a green one only now and then
+            bool CalmRoom(PlanRoom r) => l.ZoneOf(r.Id) == DangerZone.Green && greenTraps.NextDouble() >= s.Danger.GreenTraps;
             // the valuable rooms are guarded by traps first (their doorways get no sliding door)
             if (!b.EveryRoomType) Wards.Place(l, doors, s.Wards, s.MovingLasersFromHouse); // (the rooms test: workers only)
 
@@ -1212,7 +1239,7 @@ namespace Stealth.Level
                 var kind = RobotRoster.PickDevice(level, rng, s.Roster);
                 if (i < freshDevices.Count) kind = freshDevices[i];
                 // A pressure plate lies across a doorway: whoever goes through jumps over it, hacks it, or trips it.
-                if (kind == RobotKind.PressurePlate && TakeDoorway(doors, rng, hatch, out var doorway))
+                if (kind == RobotKind.PressurePlate && TakeDoorway(doors, rng, hatch, out var doorway, Calm))
                 {
                     l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = LevelLayout.FloorOf(doorway.Position.y), Position = doorway.Position, Rotation = doorway.Rotation });
                     continue;
@@ -1241,7 +1268,7 @@ namespace Stealth.Level
                             rot = Quaternion.identity;
                             break;
                     }
-                    if (room.Floor != 0 || Vector3.Distance(pos, hatch) >= MinDeviceDistanceToHatch) break;
+                    if ((room.Floor != 0 || Vector3.Distance(pos, hatch) >= MinDeviceDistanceToHatch) && (tries >= 12 || !CalmRoom(room))) break;
                 }
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = rot });
             }
@@ -1252,6 +1279,7 @@ namespace Stealth.Level
             {
                 var room = candidates[rng.Next(candidates.Count)];
                 if (!used.Add(room.Id)) { i--; continue; }
+                if (CalmRoom(room)) { i--; continue; } // (the room is used up: the loop still ends)
                 var (c, inward) = CornerOf(l, room, rng, 0.45f);
                 if (room.Floor == 0 && Vector3.Distance(c, l.HatchPosition) < HatchUnwatched) continue; // not over the team's heads
                 var pos = c + Vector3.up * (WallHeight - 0.3f);
@@ -1259,17 +1287,20 @@ namespace Stealth.Level
             }
 
             int lasers = s.LasersFor(l.FloorArea, level, l.Players);
+            var quiet = new List<LaserSpot>(); // green doorways passed over by the lasers: they may still get a door
             while (l.LaserSpots.Count < lasers && doors.Count > 0)
             {
                 int idx = rng.Next(doors.Count);
                 var spot = doors[idx];
                 doors.RemoveAt(idx);
                 if ((spot.Position - l.HatchPosition).magnitude < HatchClear) continue; // keep the lobby doorways free
+                if (Calm(spot.Position)) { quiet.Add(spot); continue; }
                 spot.Kind = (LaserPattern)rng.Next(level >= s.MovingLasersFromHouse ? 3 : 2);
                 l.LaserSpots.Add(spot);
             }
             // Doors in some of the remaining doorways (never together with a laser), more of them in flats and the hospital;
             // a flat's entry, a bathroom, a toilet, a bedroom and the plant room always have theirs.
+            doors.AddRange(quiet);
             foreach (var d in doors)
                 if (rng.NextDouble() < DoorRules.Chance(l, DoorRules.DoorwayAt(l, d.Position), b.AutoDoorChance)) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
             OwnDoors(l);
@@ -1379,13 +1410,14 @@ namespace Stealth.Level
         }
 
         /// <summary>A random doorway for a pressure plate (not next to the hatch); it is removed from the list. False if none.</summary>
-        static bool TakeDoorway(List<LaserSpot> doors, System.Random rng, Vector3 hatch, out LaserSpot spot)
+        static bool TakeDoorway(List<LaserSpot> doors, System.Random rng, Vector3 hatch, out LaserSpot spot, System.Func<Vector3, bool> calm = null)
         {
             spot = default;
             var free = new List<int>();
             for (int i = 0; i < doors.Count; i++)
             {
                 var p = doors[i].Position;
+                if (calm != null && calm(p)) continue;
                 if (LevelLayout.FloorOf(p.y) == 0 && Vector3.Distance(p, hatch) < MinDeviceDistanceToHatch) continue;
                 free.Add(i);
             }

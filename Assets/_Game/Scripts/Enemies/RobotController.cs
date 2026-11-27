@@ -111,6 +111,7 @@ namespace Stealth.Enemies
         {
             m_Brain?.Reset(Time.time);
             if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.isStopped = true;
+            DropHauledServer(); // the body on its back falls where it stands
             EndLootErrand(); // whatever it was lifting or lowering falls in front of it
             DropCargoServer();
         }
@@ -210,7 +211,8 @@ namespace Stealth.Enemies
                 m_Brain.OnSensed(Sense(), now, dt);
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
-            if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
+            if (UpdateHaulServer(now, dt)) { }
+            else if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
             UpdateDoorways(now, dt);
             HoldOnDock(dt);
             SetMode(ModeOf(m_Brain.State)); // (resting comes and goes without a change of state)
@@ -369,21 +371,26 @@ namespace Stealth.Enemies
         public void Attack(IIntruder target)
         {
             // not through a shut door (or a wall): what it reaches with is at the chest, what it hits too
-            if (!Perception.WallBetween(Feet + Vector3.up * 1.1f, Perception.AimPoint(target, 0.6f))) target.HitServer(transform.position);
+            if (Perception.WallBetween(Feet + Vector3.up * 1.1f, Perception.AimPoint(target, 0.6f))) return;
+            target.HitServer(transform.position, Cause);
+            // down at once: it takes the body away itself
+            if (Traits.CarriesPlayers && target is PlayerController body && body.CanBeCarried) FetchServer(body);
         }
 
         public void RaiseAlarm(Vector3 at, float radius)
         {
+            if (Faction == Stealth.Level.Faction.Renegade) return; // on its own: it calls nobody
             if (GameManager.Instance != null) GameManager.Instance.RaiseAlarmServer(at, radius);
         }
 
         /// <summary>Radio: nearby robots on the same floor come to check the spot (they do not chase right away).</summary>
         public void CallForBackup(Vector3 at)
         {
+            if (Faction == Stealth.Level.Faction.Renegade) return;
             var positions = new List<Vector3>(Robots.Count);
             foreach (var r in Robots) positions.Add(r.transform.position);
             foreach (int i in RobotRadio.Recipients(transform.position, positions))
-                Robots[i].InvestigateServer(at, false);
+                if (Robots[i].Faction == Stealth.Level.Faction.Servant) Robots[i].InvestigateServer(at, false);
             Pulse(PulseRadio);
         }
 
@@ -446,6 +453,10 @@ namespace Stealth.Enemies
             var rng = LevelRandom.Shared(RandomChannel.Patrol);
             bool sameFloorOnly = !Traits.CanUseStairs || rng.Value() < 0.75f;
             var options = layout.PatrolPoints.FindAll(p => (!sameFloorOnly || LevelLayout.FloorOf(p.y) == myFloor) && MayVisit(layout, p));
+            // its rounds keep to rooms dangerous enough for it: the staff goes anywhere, a guard not into the green rooms
+            var own = RobotRoster.ZoneOf(Kind);
+            var zoned = own == DangerZone.Green ? options : options.FindAll(p => DangerZones.Patrols(own, layout.ZoneAt(p)));
+            if (zoned.Count > 0) options = zoned;
             if (options.Count == 0) options = layout.PatrolPoints;
             // Prefer nearby rooms so that robots keep "their" area.
             var here = transform.position;

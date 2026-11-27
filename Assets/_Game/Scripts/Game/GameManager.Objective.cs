@@ -120,6 +120,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Vault || door != l.VaultDoor
                 || !IsOpened(OpenKeys.Door(door)) || IsOpened(OpenKeys.Stage(JobStage.VaultOpen))) return;
             m_Opened.Add(OpenKeys.Stage(JobStage.VaultOpen));
+            RaiseDangerServer(DangerEvent.Objective);
             OpenedVersion++;
         }
 

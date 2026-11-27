@@ -33,5 +33,7 @@ namespace Stealth.Enemies
         public float Homing = 2.2f;
         [Tooltip("Hits if the target is this close at landing.")]
         public float HitDistance = 1.5f;
+        [Tooltip("A player it knocks out it spins into a cocoon and hangs this high above the floor, metres (a teammate cuts them down with E).")]
+        public float CocoonHeight = 1.1f;
     }
 }

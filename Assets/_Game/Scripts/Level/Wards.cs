@@ -82,6 +82,7 @@ namespace Stealth.Level
             {
                 bool must = room.Id == l.VaultRoom || Worth(l, room, -1) >= 800f || IsCageRoom(l, room);
                 if (guarded.Count >= want && !must) break;
+                if (!must && l.ZoneOf(room.Id) == DangerZone.Green) continue; // the green rooms stay all but free of traps
                 // by the team's way in nothing hostile starts (the vault and the hostage are never there)
                 if (!must && room.Floor == 0 && Vector3.Distance(room.Center, l.HatchPosition) < NearHatch) continue;
                 guarded.Add(room.Id);

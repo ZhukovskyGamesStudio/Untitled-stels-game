@@ -214,7 +214,10 @@ namespace Stealth.Enemies
                     if (k >= 1f)
                     {
                         if (m_Prey != null && !m_Prey.IsDown && Vector3.Distance(m_Prey.Position, transform.position) < Profile.HitDistance)
-                            m_Prey.HitServer(transform.position);
+                        {
+                            m_Prey.HitServer(transform.position, Cause);
+                            Cocoon(m_Prey);
+                        }
                         m_Mode = Mode.Return;
                         m_ModeStart = Time.time;
                         m_From = transform.position;
@@ -262,6 +265,15 @@ namespace Stealth.Enemies
             // from the ceiling it drops straight on them; on a wall it runs to them first
             if (m_Mode == Mode.Cross) StartLeap(p);
             else m_Mode = Mode.Rush;
+        }
+
+        /// <summary>Server: the prey it knocked out is spun into a cocoon and hung under the ceiling where it fell.</summary>
+        void Cocoon(IIntruder prey)
+        {
+            if (prey is not Stealth.Player.PlayerController body || !body.CanBeCarried) return;
+            var at = body.transform.position;
+            at.y = LevelLayout.FloorY(LevelLayout.FloorOf(at.y)) + Profile.CocoonHeight;
+            body.ImprisonServer(Stealth.Player.CaptiveKind.Cocoon, at);
         }
 
         void StartLeap(IIntruder p)

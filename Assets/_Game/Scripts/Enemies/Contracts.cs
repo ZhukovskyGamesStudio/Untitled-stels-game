@@ -19,8 +19,10 @@ namespace Stealth.Enemies
         float GroundSpeed { get; }
         /// <summary>Carries loot of this ItemCatalog colour (colour sorters).</summary>
         bool Carries(int color);
-        /// <summary>Server: deal one hit coming from <paramref name="source"/>.</summary>
-        void HitServer(Vector3 source);
+        /// <summary>Server: deal one hit coming from <paramref name="source"/>; <paramref name="cause"/>: whose it is (the servants carry theirs to prison).</summary>
+        void HitServer(Vector3 source, Stealth.Player.DownCause cause = Stealth.Player.DownCause.Servant);
+        /// <summary>Lying with nobody holding them: a robot that carries players can lift this one.</summary>
+        bool CanBeCarried => false;
     }
 
     /// <summary>Something a player can switch off for a while (hold E).</summary>

@@ -73,7 +73,7 @@ namespace Stealth.Items
         /// <see cref="LootSettings.MinSpacing"/> to each other. Value bonus: higher floors and dark rooms are richer.
         /// Never worth less than <paramref name="minValue"/> (the house holds its quota twice over): more things, then better ones.
         /// </summary>
-        public static List<Loot> Plan(LevelLayout l, System.Random rng, LootSettings s = null, float minValue = 0f)
+        public static List<Loot> Plan(LevelLayout l, System.Random rng, LootSettings s = null, float minValue = 0f, DangerSettings danger = null)
         {
             s ??= new LootSettings();
             float spacing = s.MinSpacing;
@@ -98,7 +98,8 @@ namespace Stealth.Items
                 + (l.Location == Location.Office ? s.OfficeBonus : 0)
                 + (InHidden(p) ? s.HiddenRoomBonus : 0)
                 + Mathf.RoundToInt(s.DepthBonus * l.DepthShare(l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Id ?? -1))
-                + (RegionOf(p) >= 0 ? s.KeyRoomBonus : 0);
+                + (RegionOf(p) >= 0 ? s.KeyRoomBonus : 0)
+                + (danger != null ? danger.LootBonusOf(l.ZoneAt(p)) : 0);
             bool InHidden(Vector3 p) => l.HiddenRoom >= 0 && l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Id == l.HiddenRoom;
             // in a room worth the detour the shape is the bigger of two draws (bigger things are worth more)
             int Shape(Vector3 p)

@@ -93,7 +93,7 @@ namespace Stealth.Player
         readonly HoldProgress<Detector> m_HackHeld = new();
         readonly HoldProgress<AutoDoor> m_DoorHeld = new();
         /// <summary>0..1 of holding E over a downed teammate.</summary>
-        public float ReviveShare => ReviveProgress / m_Interaction.ReviveTime;
+        public float ReviveShare => ReviveProgress / FreeTimeOf(ReviveTarget);
         /// <summary>0..1 of holding E at a robot / device.</summary>
         public float HackShare => HackProgress / HackHoldTime;
         /// <summary>Seconds of E the target in reach takes: a hack, or the upgraded screwdriver taking a device apart.</summary>
@@ -207,6 +207,8 @@ namespace Stealth.Player
             Gas = new GasExposure(tuning.Gas);
             m_Interaction = tuning.Interaction;
             m_HealthSettings = tuning.Health;
+            m_CaptiveSettings = tuning.Captive;
+            m_Ailments = tuning.Ailments;
             Motor.Landed += OnLanded;
         }
 
@@ -310,6 +312,7 @@ namespace Stealth.Player
                 float s = d.magnitude / Time.deltaTime;
                 ServerSpeed = s > 20f ? 0f : Mathf.Lerp(ServerSpeed, s, 1f - Mathf.Exp(-10f * Time.deltaTime));
                 UpdateFlashlightServer(Time.deltaTime);
+                UpdateAilmentsServer();
             }
             UpdateFlashlightView();
             UpdateModelPose();
@@ -335,6 +338,7 @@ namespace Stealth.Player
             // Turning a safe's dial: the player stays put (the mouse turns the dial). In the hatch: look around, no walking.
             var input = DevFlags.Autopilot ?? PlayerInputState.FromDevices(!freeCursor && !cracking);
             if (InHatch) input = new PlayerInputState { Look = input.Look };
+            input = AilInput(input);
             EnterHatchIfNeeded();
             Motor.InHatch = InHatch;
             UpdateLadder(input, Time.deltaTime);
@@ -342,6 +346,9 @@ namespace Stealth.Player
             HoldLook();
             UpdateGearMotion();
             UpdateCrafted();
+            // carried by a robot or held in a place: the body stays there (the view still turns)
+            if (HoldCaptive()) input = new PlayerInputState { Look = input.Look };
+            else
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             IntoDuctIfJumping();
             UpdateSeat(menu);
@@ -365,6 +372,7 @@ namespace Stealth.Player
         const float UndergroundFog = 0.085f, UndergroundAmbient = 0.15f;
         static readonly int StyDarkId = Shader.PropertyToID("_StyDark");
         bool m_AmbientDimmed;
+        static readonly Color SmokeColor = new(0.32f, 0.33f, 0.35f);
 
         /// <summary>
         /// The air of where the camera is, at once (not eased in): after a house is built under a camera in the sewer the
@@ -407,8 +415,9 @@ namespace Stealth.Player
             // Visual only — the gas still hurts where it did (UpdateGas).
             var air = VisualStyles.World;
             VisualStyles.Underground = Toward(VisualStyles.Underground, 0f, 1.2f);
-            RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, air.IndoorFogDensity, 3f);
-            RenderSettings.fogColor = Blend(RenderSettings.fogColor, air.IndoorFog, 2f);
+            // in a smoke machine's cloud the air is thick and grey: a few steps of sight
+            RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, InSmoke ? Mathf.Max(air.IndoorFogDensity, m_Ailments.SmokeDensity) : air.IndoorFogDensity, InSmoke ? 1.2f : 3f);
+            RenderSettings.fogColor = Blend(RenderSettings.fogColor, InSmoke ? SmokeColor : air.IndoorFog, 2f);
             Camera.backgroundColor = Color.black; // the gas pass adds the sky where nothing was drawn
             GasView.Show(layout, air, layout.IsInside(Camera.transform.position));
         }
@@ -451,6 +460,8 @@ namespace Stealth.Player
             bool outside = layout != null && !layout.IsInside(transform.position);
             // Lying, watching a teammate or in god mode, the gas has nothing to do with you (no overlay, no knockout).
             if (Downed || Invulnerable) { Gas.Reset(); GasShare = 0f; return; }
+            // (an exterminator's cloud is the same gas, indoors)
+            outside |= Hazards.At(HazardKind.Gas, transform.position, Session.ServerTime);
             var effect = Gas.Tick(outside, Time.deltaTime);
             GasShare = Gas.Share;
             if (effect == GasExposure.Effect.Laugh) EmitNoise(Gas.Settings.LaughNoise);
@@ -481,7 +492,7 @@ namespace Stealth.Player
             ReviveTarget = null;
             foreach (var p in All)
             {
-                if (p == this || !p.Downed) continue;
+                if (p == this || !p.CanBeFreed) continue;
                 var at = p.transform.position;
                 if (View is { } view && !view.At(at, at + Vector3.up * 0.5f, 0.7f)) continue; // looking at them
                 if ((at - transform.position).magnitude <= m_Interaction.ReviveDistance) { ReviveTarget = p; break; }
@@ -489,7 +500,7 @@ namespace Stealth.Player
             if (ReviveTarget != null && holdE)
             {
                 ReviveProgress += WorkDt;
-                if (ReviveProgress >= m_Interaction.ReviveTime)
+                if (ReviveProgress >= FreeTimeOf(ReviveTarget))
                 {
                     Link.SendRevive(ReviveTarget);
                     ReviveProgress = 0;
@@ -581,11 +592,13 @@ namespace Stealth.Player
 
         // ------------------------------------------------------------------ server
 
-        public void HitServer(Vector3 source)
+        public void HitServer(Vector3 source, DownCause cause = DownCause.Servant)
         {
             if (!IsServer || Invulnerable) return;
             bool wasDown = Downed;
             if (!m_Health.TryHit(Time.time)) return;
+            DownedBy = cause;
+            HeldSince = Time.time;
             PublishHealth();
             if (Downed && !wasDown) GameManager.Instance?.NoteServer(this, StatKind.Downs);
             var away = transform.position - source;
@@ -594,15 +607,16 @@ namespace Stealth.Player
             Link.SendHitFeedback(away);
         }
 
-        public void ReviveServer()
-        {
-            m_Health.Revive(Time.time);
-            PublishHealth();
-        }
+        public void ReviveServer() => FreeServer();
+
+        /// <summary>Lying with nobody holding them (a carrier may lift them).</summary>
+        public bool CanBeCarried => IsSpawned && KnockedOut && Captive == CaptiveKind.None && !InHatch;
 
         public void ResetForLevelServer()
         {
             m_Health = HealthState.Full(Time.time, m_HealthSettings);
+            ClearCaptivityServer();
+            ClearAilmentsServer();
             InHatch = false;
             PublishHealth();
         }
@@ -663,15 +677,17 @@ namespace Stealth.Player
         {
             if (Downed || Invulnerable) return;
             m_Health.Knockout(Time.time);
+            DownedBy = DownCause.Self;
+            HeldSince = Time.time;
             PublishHealth();
         }
 
         /// <summary>Server: the owner finished holding E over a downed teammate.</summary>
         public void OnReviveRequest(PlayerController other)
         {
-            if (Downed || other == null || !other.Downed) return;
+            if (Downed || other == null || !other.CanBeFreed) return; // (not off a robot's back: stop the robot first)
             if ((other.transform.position - transform.position).magnitude > m_Interaction.ReviveDistance + 1f) return;
-            other.ReviveServer();
+            other.FreeServer();
             GameManager.Instance?.NoteServer(this, StatKind.Revives);
         }
 

@@ -107,6 +107,7 @@ namespace Stealth.Enemies
 
         protected void RaiseAlarm(Vector3 at)
         {
+            if (Faction == Stealth.Level.Faction.Renegade) return; // on its own: it calls nobody
             if (GameManager.Instance != null) GameManager.Instance.RaiseAlarmServer(at, Device.AlarmRadius);
         }
     }

@@ -8,6 +8,8 @@ namespace Stealth.UI
     public struct PromptContext
     {
         public bool Downed, MenuOpen, CursorMode, Cracking;
+        /// <summary>Caught in a drone's net: E tears out of it.</summary>
+        public bool Netted;
         public int Hp;
         public bool CanGetUp;
         /// <summary>Knocked out and looking through a teammate's eyes.</summary>
@@ -62,6 +64,20 @@ namespace Stealth.UI
     }
 
     /// <summary>The glyph in the middle of the screen: a dot, or what the thing in front of you is for.</summary>
+    /// <summary>What a knocked-out player reads on the screen (pure): where they are held.</summary>
+    public static class DownedRules
+    {
+        public static string Key(Player.CaptiveKind kind) => kind switch
+        {
+            Player.CaptiveKind.Carried => "hud.carried",
+            Player.CaptiveKind.Prison => "hud.prison",
+            Player.CaptiveKind.Cocoon => "hud.cocoon",
+            Player.CaptiveKind.Ward => "hud.ward",
+            Player.CaptiveKind.Lair => "hud.lair",
+            _ => "hud.out_cold",
+        };
+    }
+
     public enum ReticleIcon { Dot, Hand, Lock, Key, Hack, Revive, Heal, Search, Seat, Fuel, Terminal, Craft, Lever, Safe, Crate, Door, Vent }
 
     /// <summary>The reticle this frame: hidden (hands out, lying, in a menu), its glyph, dimmed when it can't be used now, the hold progress.</summary>
@@ -267,6 +283,7 @@ namespace Stealth.UI
                 else if (c.Hp > 0 && c.CanGetUp) into.Add(new Hint(K(GameAction.Jump), Loc.T("hint.get_up")));
                 return into;
             }
+            if (c.Netted) into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.struggle")));
             if (c.Cracking) return into; // the safe's own screen
             if (c.AtTerminal)
             {

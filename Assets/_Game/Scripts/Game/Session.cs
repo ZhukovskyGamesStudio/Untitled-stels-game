@@ -128,6 +128,8 @@ namespace Stealth.Game
         void SendRevive(PlayerController target);
         /// <summary>Owner → server: get up after being knocked down (HP left).</summary>
         void SendGetUp();
+        /// <summary>Owner → server: tore out of the net.</summary>
+        void SendStruggle();
         void SendHack(Detector target);
         /// <summary>Owner → server: hack this robot / device from the hacking terminal (index in the layout's props).</summary>
         void SendRemoteHack(Detector target, int terminal);

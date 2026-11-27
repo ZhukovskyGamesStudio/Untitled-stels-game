@@ -620,6 +620,7 @@ namespace Stealth.UI
             return new PromptContext
             {
                 Downed = me.Downed,
+                Netted = me.Netted && !me.Downed,
                 Hp = me.Hp,
                 CanGetUp = me.CanGetUp,
                 Watching = me.Watching != null,
@@ -726,7 +727,7 @@ namespace Stealth.UI
             Ui.Show(DownedTint, down);
             // Lying with health left needs no words (the hint names the key to get up); out cold — whose eyes these are.
             string downed = !down || gm.Phase != RunPhase.Playing || me.Hp > 0 ? null
-                : me.Watching != null ? me.Watching.Nick : Loc.T("hud.out_cold");
+                : me.Watching != null ? me.Watching.Nick : Loc.T(DownedRules.Key(me.Captive));
             Ui.Show(DownedText, downed != null);
             if (downed != null && DownedText.text != downed) DownedText.text = downed;
 

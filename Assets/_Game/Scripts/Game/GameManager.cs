@@ -63,7 +63,7 @@ namespace Stealth.Game
                 {
                     m_HouseEntered = true;
                     LevelStartTime = Time.time;
-                    HouseClockAt = Session.ServerTime;
+                    HouseClockAt = Session.ServerTime - m_CarriedDanger; // the run's danger so far: the clock does not start at zero
                     return;
                 }
         }
@@ -426,6 +426,9 @@ namespace Stealth.Game
         {
             m_HouseEntered = false;
             HouseClockAt = 0;
+            BeginHouseDangerServer();
+            BeginHouseCaptivesServer();
+            Hazards.Clear();
             FrameBudget.Step = "the old house's things despawned";
             BeginHouseStatsServer();
             foreach (var obj in m_Spawned.ToArray())
@@ -527,7 +530,7 @@ namespace Stealth.Game
             int total = 0;
             var lootSettings = HouseLevel.Loot;
             float inStorage = lootSettings.InStorageChance;
-            var planned = LootPlanner.Plan(layout, rng, lootSettings, m_Run.LootFor(layout.LevelIndex, TeamSize));
+            var planned = LootPlanner.Plan(layout, rng, lootSettings, m_Run.LootFor(layout.LevelIndex, TeamSize), HouseLevel.Security.Danger);
             foreach (var loot in planned)
             {
                 float yaw = rng.Next(4) * 90f + (float)rng.NextDouble() * 20f;
@@ -636,10 +639,13 @@ namespace Stealth.Game
 
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
+            int alarms = m_Run.Alarms;
             m_Run.RaiseAlarm(Session.ServerTime);
+            if (m_Run.Alarms > alarms) RaiseDangerServer(DangerEvent.Alarm);
             m_Bot?.HideServer(ActiveLevel.Layout); // the team's storage robot runs home to the basement
             foreach (var robot in RobotController.Robots)
-                if (robot.Docked) robot.AlarmServer(position); // resting guards wake wherever they are
+                if (robot.Faction == Stealth.Level.Faction.Renegade) continue; // the renegades answer nobody's alarm
+                else if (robot.Docked) robot.AlarmServer(position); // resting guards wake wherever they are
                 else if ((robot.transform.position - position).magnitude <= radius)
                     robot.InvestigateServer(position, true);
         }
@@ -682,8 +688,7 @@ namespace Stealth.Game
             if (m_Sewer != null && m_Sewer.UnderHouse && m_Sewer.Built && ActiveLevel.Ready) UpdateRouteServer(); // (may drive off)
             if (Phase != RunPhase.Playing) return;
             UpdateReinforcements();
-            foreach (var p in PlayerController.All)
-                if (!p.KnockedOut) return; // lying with HP left is not out: they get up
+            if (!UpdateCaptivesServer()) return; // somebody is up, or comes back by themself
             if (m_Run.Wipe()) Banner(Loc.Pack("banner.run_over", RunTotal));
         }
 
@@ -740,12 +745,14 @@ namespace Stealth.Game
             var layout = ActiveLevel.Layout;
             if (layout == null || layout.PatrolPoints.Count == 0 || DriveUntil > 0 || !m_HouseEntered) return;
             var s = m_Run.Settings;
-            int due = s.ReinforcementsFor(layout.FloorArea).Due(HouseTime);
+            UpdateEscalation(layout);
+            // (the house's clock is the danger: it also jumps forward with what the team does, Escalation)
+            int due = s.ReinforcementsFor(layout.FloorArea).Due(HouseClock);
             if (m_Reinforcements >= due) return;
             var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Reinforcements, m_Reinforcements));
             m_Reinforcements++;
             var roster = HouseLevel.Security.Roster.Robots;
-            var kind = RobotRoster.PickReinforcement(roster, layout.LevelIndex, rng);
+            var kind = RobotRoster.PickReinforcement(roster, layout.LevelIndex, rng, Escalation.Tier(HouseClock, s.Escalation), layout.Kind, HouseLevel.Security.Roster.ByHouse);
             var at = FurthestEntry(layout);
             if (SpawnRobotServer(kind, at, Quaternion.identity) == null) return;
             Banner(Loc.Pack("banner.reinforcement"));
@@ -819,6 +826,7 @@ namespace Stealth.Game
             DevFlags.ForcedSeed = 0;
             EnsureRoute(m_RunSeed);
             m_Run.BeginRun();
+            ResetDangerServer();
             m_Opened.Clear();
             m_Hacked.Clear();
             ForgetLeavers();

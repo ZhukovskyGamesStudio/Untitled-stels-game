@@ -28,6 +28,7 @@ namespace Stealth.Game
         public void SendGasKnockout() => m_P.OnGasKnockoutRequest();
         public void SendRevive(PlayerController target) => m_P.OnReviveRequest(target);
         public void SendGetUp() => m_P.OnGetUpRequest();
+        public void SendStruggle() => m_P.OnStruggleRequest();
         public void SendHack(Detector target) => m_P.OnHackRequest(target);
         public void SendRemoteHack(Detector target, int terminal) => Game?.RemoteHackServer(m_P, terminal, target);
         public void SendPing(Vector3 position) => m_P.OnPingRequest(position);

@@ -85,6 +85,14 @@ namespace Stealth.Enemies
         public float AttackRange = 1.7f;
         public float AttackCooldown = 1.7f;
 
+        [Header("Carrying players")]
+        [Tooltip("A player it knocks out (or one lying near, put down by its side) it lifts and carries away: a servant to the prison, a renegade to its lair.")]
+        public bool CarriesPlayers;
+        [Tooltip("How fast it walks with a body on its back.")]
+        public float CarrySpeed = 2.2f;
+        [Tooltip("Seconds it takes to lift a body.")]
+        public float LiftTime = 1.5f;
+
         [Header("Moving loot (workers)")]
         [Tooltip("On patrol it picks up loot lying on the floor nearby and puts what it carries down somewhere else.")]
         public bool MovesLoot;

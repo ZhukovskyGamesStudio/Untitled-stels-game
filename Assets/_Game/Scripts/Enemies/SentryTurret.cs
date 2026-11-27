@@ -99,7 +99,7 @@ namespace Stealth.Enemies
             {
                 m_NextShot = Time.time + Profile.Cooldown;
                 m_LockStart = Time.time; // next shot needs another lock
-                seen.HitServer(transform.position);
+                seen.HitServer(transform.position, Cause);
                 Pulse(PulseShot);
             }
         }

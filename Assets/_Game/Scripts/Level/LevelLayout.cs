@@ -345,6 +345,12 @@ namespace Stealth.Level
             if (m_DeepestSteps < 0) { m_DeepestSteps = 1; foreach (int s in RoomSteps) m_DeepestSteps = Mathf.Max(m_DeepestSteps, s); }
             return RoomSteps[room] < 0 ? 1f : RoomSteps[room] / (float)m_DeepestSteps;
         }
+        /// <summary>The danger zone of every room by id (<see cref="DangerZones"/>); null before the zones are assigned.</summary>
+        public DangerZone[] Zones;
+        /// <summary>The zone of a room (yellow where there are no zones: the rules before them; green outside any room).</summary>
+        public DangerZone ZoneOf(int room) => Zones == null ? DangerZone.Yellow : room < 0 || room >= Zones.Length ? DangerZone.Green : Zones[room];
+        /// <summary>The zone of the room at a point.</summary>
+        public DangerZone ZoneAt(Vector3 p) => ZoneOf(RoomAt(p + Vector3.up * 0.3f)?.Id ?? -1);
         /// <summary>Doors locked with a key block, and where each key lies (<see cref="HouseFeatures.KeyDoors"/>).</summary>
         public readonly List<KeyDoor> KeyDoors = new();
         /// <summary>Searchable crates: indices in <see cref="Props"/>.</summary>
@@ -376,6 +382,9 @@ namespace Stealth.Level
         /// <summary>What the charging room was before the robots took it (its remnant shows it).</summary>
         public RoomType ChargingFrom = RoomType.Office;
         public readonly List<Pose> ChargingDocks = new();
+        /// <summary>Where the servants keep knocked-out players (<see cref="Prison"/>): its room (−1 none) and the spots on its floor.</summary>
+        public int PrisonRoom = -1;
+        public readonly List<Vector3> PrisonSpots = new();
         /// <summary>Rooms guarded by traps (<see cref="Wards"/>), new enemy mode.</summary>
         public readonly List<int> WardedRooms = new();
         /// <summary>The crawl ducts in each storey's ceiling void (index = the storey under it), <see cref="VentPlan"/>.</summary>

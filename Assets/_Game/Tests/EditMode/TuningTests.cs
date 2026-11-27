@@ -162,7 +162,7 @@ namespace Stealth.Tests
             for (int i = 0; i < 25 && last != GasExposure.Effect.Knockout; i++) last = gas.Tick(true, 0.1f);
             Assert.AreEqual(GasExposure.Effect.Knockout, last);
 
-            var h = HealthState.Full(0f, new HealthSettings { LevelStartGrace = 0f, HitGrace = 0f, GetUpDelay = 0f, GetUpGrace = 0f });
+            var h = HealthState.Full(0f, new HealthSettings { LevelStartGrace = 0f, HitGrace = 0f, GetUpDelay = 0f, GetUpGrace = 0f, OneHitDown = false });
             Assert.IsTrue(h.TryHit(0.1f));
             Assert.IsTrue(h.GetUp(0.1f), "no time on the floor");
             Assert.IsTrue(h.TryHit(0.2f), "no invulnerability");

@@ -11,6 +11,10 @@ namespace Stealth.Configs
         public MovementSettings Movement = new();
         public StaminaSettings Stamina = new();
         public HealthSettings Health = new();
+        [Tooltip("Knocked out and held: freeing a teammate, a lone player's way back, the carriers.")]
+        public CaptiveSettings Captive = new();
+        [Tooltip("Nets, stuns, the muddled head, goo, smoke.")]
+        public AilmentSettings Ailments = new();
         public NoiseSettings Noise = new();
         public GasSettings Gas = new();
         [Tooltip("Holding E: reviving teammates and hacking.")]

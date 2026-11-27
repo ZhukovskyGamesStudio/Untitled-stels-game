@@ -25,5 +25,9 @@ namespace Stealth.Level
         // the car upgrade bench: the run's recipe of every upgrade and level
         public const int CarUpgrades = 0xCA67;
         public const int Cassettes = 0xCA55;
+        // the danger zones of a house (per room), which traps stay in green rooms, the kind of a robot by its room's zone
+        public const int DangerZones = 0xDA26, GreenTraps = 0xDA27;
+        // which muddle a player wakes with in the nurse's bed
+        public const int Muddle = 0x3D1E;
     }
 }

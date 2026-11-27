@@ -122,7 +122,7 @@ namespace Stealth.Player
             var inv = GetComponent<PlayerInventory>();
             if (inv != null && inv.Carries(ItemCatalog.Boots)) return;
             GameManager.Instance?.NoteFallServer(this);
-            HitServer(transform.position + Vector3.down);
+            HitServer(transform.position + Vector3.down, DownCause.Self);
         }
 
         bool m_PickingView;
@@ -142,7 +142,7 @@ namespace Stealth.Player
         {
             float scale = GearRules.SlowNow(m_LandSlow, Time.time - m_LandedAt, Gear.FallSlowSeconds);
             if (Caffeinated) scale *= Gear.CoffeeMoveScale;
-            Motor.SpeedScale = scale;
+            Motor.SpeedScale = scale * AilmentSpeed;
             Rush = UI.RushRules.Strength(Caffeinated, Motor.HorizontalSpeed, Motor.WalkSpeed);
             Motor.FovBoost = Rush * UI.RushRules.FovKick;
         }
