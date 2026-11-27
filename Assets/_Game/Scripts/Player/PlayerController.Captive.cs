@@ -26,6 +26,20 @@ namespace Stealth.Player
 
         CaptiveSettings m_CaptiveSettings = new();
 
+        [Header("Held")]
+        [Tooltip("The spider's cocoon round the player (shown while held in one).")]
+        public GameObject CocoonView;
+        [Tooltip("The drone's net over the player (shown while netted).")]
+        public GameObject NetView;
+
+        /// <summary>Every peer: the cocoon and the net show while the player is in them.</summary>
+        void ShowHeld()
+        {
+            bool cocoon = Captive == CaptiveKind.Cocoon, net = Netted && !Downed;
+            if (CocoonView != null && CocoonView.activeSelf != cocoon) CocoonView.SetActive(cocoon);
+            if (NetView != null && NetView.activeSelf != net) NetView.SetActive(net);
+        }
+
         /// <summary>A teammate can bring this player round with E right now.</summary>
         public bool CanBeFreed => Downed && CaptiveRules.CanFree(Captive);
 

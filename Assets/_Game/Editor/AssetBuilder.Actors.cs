@@ -164,6 +164,7 @@ namespace Stealth.EditorTools
                     s.LidarRange = 6f; s.LidarHeight = 0.22f; s.LidarTurnSpeed = 140f; s.LidarRate = 15f;
                     t.CanUseStairs = false; // wheels
                     t.PatrolSpeed = 1.4f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.1f; t.AttackRange = 1.3f;
+                    t.Role = RobotRole.Mopper; t.RolePeriod = 6f; t.RoleRadius = 1.4f; t.RoleDuration = 35f;
                 });
                 var rc = go.GetComponent<RobotController>();
                 var lidar = go.AddComponent<RobotLidar>();
@@ -171,8 +172,11 @@ namespace Stealth.EditorTools
                 lidar.Head = Find(go, "AccentLidar");
                 lidar.Line = Beam(go, "LidarBeam", 0.025f);
                 rc.Lidar = lidar;
+                rc.PatchPrefab = BuildPatch("GooPuddle", Stealth.Player.HazardKind.Goo); // the cleaner leaves sticky goo behind it
                 return go;
             });
+            var gooPatch = BuildPatch("GooPuddle", Stealth.Player.HazardKind.Goo);
+            BuildDangerRobots(Robot, ripple, gooPatch, BuildPatch("SmokeCloud", Stealth.Player.HazardKind.Smoke), BuildPatch("GasCloud", Stealth.Player.HazardKind.Gas));
             Robot(RobotKind.Turret, RobotPrefabs + "/RobotTurret.prefab", () => Device<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>
             {
                 t.Profile = Profile<TurretProfile>("RobotTurret", p => p.ForgetRate = 0.6f);
@@ -410,6 +414,7 @@ namespace Stealth.EditorTools
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);
             pc.Voice = AddVoice(root.transform);
             pc.Voice.Owner = pc;
+            AddHeldViews(root);
             return root;
         }
 

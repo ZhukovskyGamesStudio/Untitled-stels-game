@@ -106,6 +106,7 @@ namespace Stealth.EditorTools
                 b.ChaseMusic = Clip("Music/music_chase");
                 FillLateClips(b);
                 FillRecordedClips(b);
+                FillEnemyClips(b);
             });
             if (RecordedClipsMissing(s_Bank))
             {
@@ -147,7 +148,26 @@ namespace Stealth.EditorTools
                 s_Bank.HostageVoice = new[] { "help", "key", "out", "quiet", "hurry" }.Select(n => Clip($"Voices/hostage_{n}")).ToArray();
                 EditorUtility.SetDirty(s_Bank);
             }
+            if (new[] { s_Bank.GooSplat, s_Bank.GasHiss, s_Bank.Shriek, s_Bank.NetThrow, s_Bank.SalesPitch, s_Bank.DoorBreak, s_Bank.LockClack, s_Bank.GunShot, s_Bank.LureCall }.Any(c => c == null))
+            {
+                FillEnemyClips(s_Bank);
+                EditorUtility.SetDirty(s_Bank);
+            }
             return s_Bank;
+        }
+
+        /// <summary>The new robots' one-shots (Tools/Audio/generate_sounds.py).</summary>
+        static void FillEnemyClips(SoundBank b)
+        {
+            b.GooSplat = Clip("Robots/goo_splat");
+            b.GasHiss = Clip("Robots/gas_hiss");
+            b.Shriek = Clip("Robots/shriek");
+            b.NetThrow = Clip("Robots/net_throw");
+            b.SalesPitch = Clip("Robots/sales_pitch");
+            b.DoorBreak = Clip("Robots/door_break");
+            b.LockClack = Clip("Robots/lock_clack");
+            b.GunShot = Clip("Robots/gun_shot");
+            b.LureCall = Clip("Robots/lure_call");
         }
 
         static AudioClip[] Takes(string path, int count) => Enumerable.Range(0, count).Select(i => Clip($"{path}_{i}")).ToArray();

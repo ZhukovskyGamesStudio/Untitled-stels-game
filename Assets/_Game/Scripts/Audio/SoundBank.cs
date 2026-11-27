@@ -34,6 +34,8 @@ namespace Stealth.Audio
         public AudioClip MotorServo, MotorTracks, MotorBrush, MotorTurbine;
         [Tooltip("A guard's loops (GuardSounds): resting on its dock, walking its rounds, chasing.")]
         public AudioClip GuardCharge, GuardPatrol, GuardChase;
+        [Tooltip("The new robots' one-shots: goo squirted on the floor, smoke/gas let out, the banshee's shriek, a net launched, the salesman's pitch, a door drilled open, a lock set / a grille screwed back, an armed guard's shot, the relay speaker's lure call.")]
+        public AudioClip GooSplat, GasHiss, Shriek, NetThrow, SalesPitch, DoorBreak, LockClack, GunShot, LureCall;
 
         [Header("Items and places")]
         [Tooltip("The lure speaker's music (loop).")]

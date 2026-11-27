@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ef6c256c790aa64faf5e440bfbaa18d, type: 3}
+  m_Name: RobotManiacConfig
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotProfile
+  Animation:
+    RotorSpeed: 1800
+    StepFrequency: 1.6
+    LegSwing: 25
+    Lean: 0
+    Bob: 0
+    StepStride: 0.45
+    StepTime: 0.22
+    StepLift: 0.22
+  Senses:
+    HasEyes: 1
+    ViewDistance: 13
+    ViewAngle: 110
+    PeripheralDistance: 2.5
+    DetectionSpeed: 0.8
+    EyePitch: 0
+    ColorSorter: 0
+    HearingMultiplier: 0.5
+    SeismicRange: 0
+    SeismicSpeed: 0.8
+    SeismicPeriod: 2.6
+    SeismicWaveSpeed: 9
+    LidarRange: 0
+    LidarHeight: 0.22
+    LidarTurnSpeed: 140
+    LidarRate: 15
+  Traits:
+    CanUseStairs: 1
+    HoverHeight: 0
+    PatrolSpeed: 1.7
+    InvestigateSpeed: 2.8
+    ChaseSpeed: 4.3
+    LoseTargetAfter: 4
+    WarningTime: 1.5
+    CanAttack: 1
+    CargoChance: 0
+    AlarmOnDetect: 0
+    AlarmRadius: 30
+    SnitchCooldown: 12
+    AttackRange: 1.6
+    AttackCooldown: 1.7
+    Role: 7
+    RolePeriod: 25
+    RoleRadius: 6
+    RoleDuration: 10
+    RoleLimit: 0
+    Attack: 0
+    CarriesPlayers: 1
+    CarrySpeed: 2.2
+    LiftTime: 1.5
+    MovesLoot: 0
+    LootSeekRadius: 6
+    PutDownChance: 0.3
+    LootErrandCooldown: 12
+    LootHandleTime: 1.8
+    SuspiciousAt: 0.25
+    SuspicionDecay: 0.35
+    PatrolWaitMin: 2.5
+    PatrolWaitMax: 5
+    PauseScanAngle: 55
+    PauseReadyTime: 1.1
+    InvestigateLookTime: 3
+    StareTime: 4
+    AlarmHuntTime: 60

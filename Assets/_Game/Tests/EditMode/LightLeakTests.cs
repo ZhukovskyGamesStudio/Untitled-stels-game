@@ -94,7 +94,7 @@ namespace Stealth.Tests
         [Test]
         public void MaterialsEitherTakeLightOrReallyGlow()
         {
-            var unlitAllowed = new HashSet<string> { "Laser", "LaserSheet", "LaserCore", "LaserGlow", "LampGlow", "Radio", "Stomp", "Window" };
+            var unlitAllowed = new HashSet<string> { "Laser", "LaserSheet", "LaserCore", "LaserGlow", "LampGlow", "Radio", "Stomp", "Window", "SmokePuff", "GasPuff", "Tracer" };
             foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/_Game/Art/Materials" }))
             {
                 var mat = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));

@@ -960,8 +960,170 @@ def gas_laugh(level):
     return fade(np.concatenate(parts))
 
 
+# --------------------------------------------------------------------------- the new robots (each with its own stream)
+
+def goo_splat():
+    """Goo squirted on the floor: a wet slap, then sticky squelching bubbles that settle."""
+    gen = np.random.default_rng(901)
+    d = 0.5
+    n = int(d * SR)
+    slap = lowpass(gen.uniform(-1, 1, int(0.07 * SR)), 1800) * env(int(0.07 * SR), 0.001, 0.05, curve=3)
+    body = sine(lambda t: 140 * np.exp(-6 * t) + 60, 0.25) * env(int(0.25 * SR), 0.002, 0.2, curve=3) * 0.6
+    out = mix(at(slap, 0, d), at(body, 0, d))
+    for k in range(7):  # bubbles: short pitch-rising blips (a bubble popping out of goo)
+        o = 0.06 + gen.uniform(0, 0.36)
+        bd = 0.03 + gen.uniform(0, 0.03)
+        f0 = gen.uniform(250, 600)
+        b = sine(lambda t, f0=f0, bd=bd: f0 * (1 + 1.5 * t / bd), bd) * env(int(bd * SR), 0.002, bd * 0.8, curve=2)
+        out += at(b * (0.5 - 0.04 * k), o, d)
+    squish = bandpass(gen.uniform(-1, 1, n), 300, 1500) * env(n, 0.01, 0.35, curve=2.5) * 0.25
+    squish *= 0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 11 * t_axis(d)))
+    return fade(out + squish, 0.001, 0.04)
+
+
+def gas_hiss():
+    """Gas let out of a nozzle: a sharp valve pop, a pressurised hiss that fades out as the pressure drops."""
+    gen = np.random.default_rng(902)
+    d = 1.2
+    n = int(d * SR)
+    t = t_axis(d)
+    pop = lowpass(gen.uniform(-1, 1, int(0.02 * SR)), 3000) * env(int(0.02 * SR), 0.0005, 0.015)
+    hiss = highpass(gen.uniform(-1, 1, n), 2500, 3)
+    flutter = 1 + 0.15 * np.sin(2 * np.pi * 23 * t) * gen.uniform(0.5, 1)
+    tone = bandpass(gen.uniform(-1, 1, n), 5200, 6400) * 0.5  # the nozzle's whistle in the noise
+    shape = np.clip(t / 0.04, 0, 1) * np.exp(-2.2 * t) * np.linspace(1, 0, n) ** 0.5
+    return fade(mix(at(pop * 0.6, 0, d), (hiss + tone) * flutter * shape), 0.001, 0.08)
+
+
+def shriek():
+    """An ultrasonic banshee: a rising metallic scream, two detuned voices beating, harsh overtones."""
+    d = 1.4
+    n = int(d * SR)
+    t = t_axis(d)
+    f = 900 * (2600 / 900) ** np.clip(t / 0.9, 0, 1) * (1 + 0.01 * np.sin(2 * np.pi * 9 * t))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    voice = np.sin(ph) + 0.8 * np.sin(ph * 1.012) + 0.45 * np.sin(ph * 2.03) + 0.3 * np.sin(ph * 3.07) + 0.2 * np.sin(ph * 4.11)
+    voice = np.tanh(voice * 1.6)  # metallic grit
+    ring = np.sin(2 * np.pi * np.cumsum(f * 1.5 + 40) / SR) * 0.25
+    shape = np.clip(t / 0.15, 0, 1) * np.clip((d - t) / 0.3, 0, 1)
+    return fade(highpass((voice + ring) * shape, 400), 0.002, 0.03)
+
+
+def net_throw():
+    """A net launcher: a pneumatic thump, the whoosh of the net flying, its cords slapping as it spreads."""
+    gen = np.random.default_rng(904)
+    d = 0.7
+    thump = sine(lambda t: 110 * np.exp(-12 * t) + 50, 0.15) * env(int(0.15 * SR), 0.001, 0.1, curve=3)
+    puff = bandpass(gen.uniform(-1, 1, int(0.06 * SR)), 400, 2500) * env(int(0.06 * SR), 0.001, 0.04)
+    w = int(0.62 * SR)
+    tw = np.arange(w) / SR
+    whoosh = bandpass(gen.uniform(-1, 1, w), 500, 3500) * np.sin(np.pi * tw / 0.62) ** 2 * 0.5
+    out = mix(at(thump, 0, d), at(puff * 0.7, 0, d), at(whoosh, 0.05, d))
+    for k in range(5):  # cords slapping
+        s = int(0.012 * SR)
+        slap = highpass(gen.uniform(-1, 1, s), 1500) * env(s, 0.0005, 0.008)
+        out += at(slap * (0.55 - 0.07 * k), 0.34 + 0.065 * k + gen.uniform(0, 0.02), d)
+    return fade(out, 0.001, 0.04)
+
+
+def sales_pitch():
+    """A pushy salesman robot: a quick upbeat burst of syllables (no words) through a cheap megaphone."""
+    gen = np.random.default_rng(905)
+    d = 1.6
+    vowels = [[(730, 120, 1.0), (1090, 150, 0.5), (2440, 250, 0.2)], [(270, 80, 1.0), (2290, 200, 0.5), (3010, 300, 0.2)],
+              [(530, 100, 1.0), (1840, 180, 0.5), (2480, 250, 0.2)], [(570, 100, 1.0), (840, 120, 0.5), (2410, 250, 0.2)],
+              [(300, 80, 1.0), (870, 120, 0.4), (2240, 250, 0.2)]]
+    out = np.zeros(int(d * SR))
+    o = 0.03
+    k = 0
+    while o < d - 0.12:
+        sd = 0.07 + gen.uniform(0, 0.07)
+        sn = int(sd * SR)
+        ts = np.arange(sn) / SR
+        f0 = (190 + 40 * np.sin(2 * np.pi * 0.9 * o)) * (1 + 0.15 * ts / sd * (1 if k % 3 == 2 else -0.5))  # sing-song
+        pulses = 2 * ((np.cumsum(f0) / SR) % 1.0) - 1.0
+        syl = _formants(pulses, vowels[gen.integers(len(vowels))])
+        syl = syl / (np.max(np.abs(syl)) + 1e-9) * env(sn, 0.008, sd * 0.8, sustain=0.5, release=0.01)
+        if gen.uniform() < 0.4:  # a consonant burst in front
+            c = int(0.015 * SR)
+            syl[:c] += bandpass(gen.uniform(-1, 1, c), 2500, 7000) * 0.5
+        out += at(syl * gen.uniform(0.7, 1.0), o, d)
+        o += sd + gen.uniform(0.01, 0.04)
+        k += 1
+    horn = bandpass(np.tanh(out * 3.0), 600, 3800, 3)  # the megaphone: driven and narrow
+    horn += 0.15 * bandpass(horn, 1400, 1700)            # its cone ringing
+    return fade(horn, 0.002, 0.04)
+
+
+def door_break():
+    """A door drilled through: the bit grinding as it bites, then the lock giving way in a splintering metal crash."""
+    gen = np.random.default_rng(906)
+    d = 1.0
+    g = int(0.45 * SR)
+    tg = np.arange(g) / SR
+    drill = signal.sawtooth(2 * np.pi * np.cumsum(180 + 60 * tg / 0.45 + 15 * np.sin(2 * np.pi * 17 * tg)) / SR)
+    grind = bandpass(drill * (0.6 + 0.4 * gen.uniform(-1, 1, g)), 300, 4000) * np.clip(tg / 0.05, 0, 1) * 0.5
+    crash_n = int(0.55 * SR)
+    tc = np.arange(crash_n) / SR
+    bang = lowpass(gen.uniform(-1, 1, crash_n), 900) * env(crash_n, 0.001, 0.12, curve=3)
+    metal = sum(np.sin(2 * np.pi * f * tc) * a for f, a in [(523, 0.5), (1187, 0.35), (2210, 0.25), (3530, 0.15)]) * env(crash_n, 0.001, 0.45, curve=3)
+    splinter = highpass(gen.uniform(-1, 1, crash_n), 2500) * env(crash_n, 0.001, 0.2, curve=2.5)
+    splinter *= (gen.uniform(0, 1, crash_n) > 0.7) * 0.8 + 0.2  # crackle
+    crash = bang + 0.4 * metal + 0.6 * splinter
+    return fade(mix(at(grind, 0, d), at(crash, 0.42, d)), 0.002, 0.05)
+
+
+def lock_clack():
+    """A lock set / a grille screwed back on: two firm mechanical clacks."""
+    gen = np.random.default_rng(907)
+    d = 0.4
+    def clack(pitch):
+        n = int(0.06 * SR)
+        tc = np.arange(n) / SR
+        click = bandpass(gen.uniform(-1, 1, n), 1200, 6000) * env(n, 0.0005, 0.015)
+        body = np.sin(2 * np.pi * pitch * tc) * env(n, 0.0005, 0.04, curve=4) * 0.6
+        return click + body
+    return fade(mix(at(clack(900), 0.01, d), at(clack(760) * 1.0, 0.19, d)), 0.001, 0.05)
+
+
+def gun_shot():
+    """An armed guard's shot: a sharp electric crack, heavier and lower than the turret's zap."""
+    gen = np.random.default_rng(908)
+    d = 0.4
+    n = int(d * SR)
+    zap = sweep(1400, 90, 0.22) * env(int(0.22 * SR), 0.001, 0.18, curve=2)
+    crack = highpass(gen.uniform(-1, 1, int(0.04 * SR)), 1000) * env(int(0.04 * SR), 0.0003, 0.015)
+    boom = lowpass(gen.uniform(-1, 1, n), 160) * env(n, 0.001, 0.2, curve=3)
+    thud = sine(lambda t: 90 * np.exp(-8 * t) + 40, d) * env(n, 0.001, 0.25, curve=3)
+    return fade(mix(at(zap * 0.6, 0, d), at(crack, 0, d), boom * 0.9, thud * 0.7), 0.0005, 0.04)
+
+
+def lure_call():
+    """A relay speaker playing back a human "hey!": an h-puff, a voiced /e/ falling at the end, through a tinny radio horn."""
+    gen = np.random.default_rng(909)
+    d = 0.8
+    h = int(0.06 * SR)
+    puff = bandpass(gen.uniform(-1, 1, h), 800, 4000) * env(h, 0.01, 0.05) * 0.5
+    v = int(0.5 * SR)
+    tv = np.arange(v) / SR
+    f0 = 210 * (1 + 0.25 * np.clip(tv / 0.12, 0, 1)) * (1 - 0.35 * np.clip((tv - 0.18) / 0.32, 0, 1))  # rises then drops: "hey!"
+    pulses = 2 * ((np.cumsum(f0) / SR) % 1.0) - 1.0
+    e_vowel = _formants(pulses, [(530, 100, 1.0), (1840, 180, 0.6), (2480, 250, 0.25)])
+    i_vowel = _formants(pulses, [(300, 80, 1.0), (2200, 200, 0.6), (2900, 300, 0.25)])
+    glide = np.clip((tv - 0.22) / 0.2, 0, 1)
+    voiced = e_vowel * (1 - glide) + i_vowel * glide
+    voiced = voiced / (np.max(np.abs(voiced)) + 1e-9) * env(v, 0.015, 0.45, sustain=0.4, release=0.06)
+    call = np.concatenate([puff, voiced])
+    radio_v = bandpass(np.tanh(call * 4.0), 700, 3200, 3)
+    radio_v = np.round(radio_v * 24) / 24  # cheap playback
+    out = mix(at(radio_v, 0.04, d), at(bandpass(gen.uniform(-1, 1, int(0.7 * SR)), 2000, 5000) * 0.05, 0.03, d))
+    sq = bandpass(gen.uniform(-1, 1, int(0.05 * SR)), 1500, 4500) * env(int(0.05 * SR), 0.001, 0.03) * 0.4
+    out += at(sq, 0, d) + at(sq, 0.7, d)
+    return fade(out, 0.002, 0.04)
+
+
 def main():
-    out = sys.argv[-1] if len(sys.argv) > 1 and not sys.argv[-1].endswith(".py") else "Assets/_Game/Art/Audio"
+    out =sys.argv[-1] if len(sys.argv) > 1 and not sys.argv[-1].endswith(".py") else "Assets/_Game/Art/Audio"
     P = lambda cat, name: os.path.join(out, cat, name + ".wav")
     for i in range(4):
         write(P("Player", f"footstep_{i}"), footstep(i))
@@ -1042,6 +1204,16 @@ def main():
     write(P("Items", "work_unit"), work_unit(), 0.55)
     write(P("Items", "unlock_unit"), unlock_unit(), 0.75)
     write(P("Car", "grind"), grind(), 0.8)  # (last, with its own stream: the sounds above keep theirs)
+    # The new robots' one-shots: each with its own seeded stream, so nothing above changes.
+    write(P("Robots", "goo_splat"), goo_splat(), 0.8)
+    write(P("Robots", "gas_hiss"), gas_hiss(), 0.7)
+    write(P("Robots", "shriek"), shriek(), 0.8)
+    write(P("Robots", "net_throw"), net_throw(), 0.85)
+    write(P("Robots", "sales_pitch"), sales_pitch(), 0.8)
+    write(P("Robots", "door_break"), door_break(), 0.9)
+    write(P("Robots", "lock_clack"), lock_clack(), 0.75)
+    write(P("Robots", "gun_shot"), gun_shot(), 0.9)
+    write(P("Robots", "lure_call"), lure_call(), 0.8)
 
 
 if __name__ == "__main__":

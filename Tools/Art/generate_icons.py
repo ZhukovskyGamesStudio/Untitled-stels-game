@@ -714,16 +714,210 @@ def robot_sweeper(g):
 
 
 def robot_warden(g):
-    # a heavy guard behind a tall shield: wide shoulders, a head with its eye over the rim, feet below
-    g.rrect((0.32, 0.04, 0.68, 0.26), 0.06)
-    _dot(g, 0.50, 0.15, 0.06, on="d")
-    g.rrect((0.06, 0.26, 0.94, 0.44), 0.08)
-    g.rrect((0.20, 0.84, 0.40, 0.94), 0.03)
-    g.rrect((0.60, 0.84, 0.80, 0.94), 0.03)
-    shield = [(0.16, 0.32), (0.84, 0.32), (0.84, 0.64), (0.50, 0.90), (0.16, 0.64)]
-    g.poly(shield)
-    g.cut(mask_of(g.size, lambda m: [m.line([a, b], 0.035) for a, b in zip(shield, shield[1:] + shield[:1])]))
-    g.line([(0.32, 0.46), (0.50, 0.60), (0.68, 0.46)], 0.07, on="d")
+    # a stocky door-keeper: a peaked cap over a boxy head, a wide body with a padlock on its chest, stubby legs
+    g.poly([(0.30, 0.15), (0.33, 0.04), (0.67, 0.04), (0.70, 0.15)])
+    g.rrect((0.22, 0.13, 0.80, 0.19), 0.03)
+    g.rrect((0.30, 0.21, 0.70, 0.37), 0.05)
+    _dot(g, 0.50, 0.29, 0.045, on="d")
+    g.rrect((0.14, 0.40, 0.86, 0.80), 0.08)
+    g.arc((0.39, 0.44, 0.61, 0.66), 180, 360, 0.05, on="d")
+    g.line([(0.39, 0.55), (0.39, 0.60)], 0.05, on="d")
+    g.line([(0.61, 0.55), (0.61, 0.60)], 0.05, on="d")
+    g.rrect((0.33, 0.57, 0.67, 0.76), 0.03, on="d")
+    _dot(g, 0.50, 0.64, 0.03)
+    g.line([(0.50, 0.65), (0.50, 0.70)], 0.035)
+    g.rrect((0.20, 0.82, 0.42, 0.93), 0.03)
+    g.rrect((0.58, 0.82, 0.80, 0.93), 0.03)
+
+
+def robot_repairman(g):
+    # a low four-legged technician in profile, its head forward, one arm up with a big open-jaw wrench
+    g.rrect((0.16, 0.44, 0.72, 0.62), 0.07)
+    g.rrect((0.64, 0.32, 0.86, 0.50), 0.05)
+    _dot(g, 0.78, 0.40, 0.035, on="d")
+    for hip, knee, foot in (((0.22, 0.58), (0.10, 0.72), (0.14, 0.90)), ((0.36, 0.60), (0.30, 0.76), (0.34, 0.90)),
+                            ((0.52, 0.60), (0.58, 0.76), (0.54, 0.90)), ((0.66, 0.58), (0.80, 0.72), (0.76, 0.90))):
+        g.line([hip, knee, foot], RS * 0.8)
+    g.line([(0.40, 0.46), (0.22, 0.30)], RS * 0.8)
+    g.line([(0.10, 0.42), (0.32, 0.20)], 0.08)
+    _dot(g, 0.35, 0.17, 0.10)
+    slot = [(0.375, 0.195), (0.325, 0.145), (0.43, 0.04), (0.48, 0.09)]
+    g.cut(mask_of(g.size, lambda m: (m.poly(slot), _dot(m, 0.35, 0.17, 0.035))))
+
+
+def robot_smoker(g):
+    # a smoke machine: a round tank on two wheels, two chimneys on top puffing clouds
+    for cx, cy, r in ((0.22, 0.24, 0.07), (0.32, 0.15, 0.085), (0.45, 0.10, 0.06),
+                      (0.62, 0.27, 0.06), (0.73, 0.19, 0.08), (0.86, 0.12, 0.065)):
+        _dot(g, cx, cy, r)
+    g.rrect((0.22, 0.34, 0.33, 0.54), 0.02)
+    g.rrect((0.56, 0.40, 0.66, 0.54), 0.02)
+    g.rrect((0.08, 0.50, 0.88, 0.80), 0.15)
+    for x in (0.38, 0.62):
+        g.line([(x, 0.52), (x, 0.78)], 0.04, on="d")
+    for cx in (0.26, 0.70):
+        _dot(g, cx, 0.84, 0.10)
+        _dot(g, cx, 0.84, 0.035, on="d")
+
+
+def robot_relay(g):
+    # a loudspeaker mast: a horn on top facing right, a box on the pole, a tripod foot, sound waves out of the horn
+    g.poly([(0.40, 0.92), (0.30, 0.70), (0.38, 0.70), (0.46, 0.86)])
+    g.poly([(0.20, 0.92), (0.30, 0.70), (0.22, 0.70), (0.12, 0.86)])
+    g.rrect((0.08, 0.86, 0.44, 0.93), 0.03)
+    g.line([(0.26, 0.88), (0.26, 0.30)], RS)
+    g.rrect((0.14, 0.46, 0.38, 0.64), 0.04)
+    for y in (0.51, 0.59):
+        g.line([(0.19, y), (0.33, y)], 0.035, on="d")
+    g.poly([(0.12, 0.22), (0.30, 0.22), (0.56, 0.06), (0.56, 0.42), (0.30, 0.30), (0.12, 0.30)])
+    for r in (0.14, 0.28):
+        g.arc((0.56 - r, 0.24 - r, 0.56 + r, 0.24 + r), -45, 45, RS * 0.75)
+
+
+def robot_nurse(g):
+    # a nurse robot: a cap with a cross over its head, a small body, a big syringe held up at its side
+    g.poly([(0.12, 0.30), (0.18, 0.08), (0.52, 0.08), (0.58, 0.30)])
+    g.line([(0.35, 0.12), (0.35, 0.26)], 0.055, on="d")
+    g.line([(0.28, 0.19), (0.42, 0.19)], 0.055, on="d")
+    g.rrect((0.08, 0.28, 0.62, 0.60), 0.09)
+    g.line([(0.10, 0.31), (0.60, 0.31)], 0.035, on="d")
+    _dot(g, 0.25, 0.45, 0.045, on="d")
+    _dot(g, 0.45, 0.45, 0.045, on="d")
+    g.rrect((0.16, 0.64, 0.54, 0.92), 0.07)
+    g.line([(0.52, 0.74), (0.74, 0.64)], RS * 0.8)
+    g.rrect((0.74, 0.28, 0.90, 0.68), 0.03)
+    for y in (0.38, 0.48, 0.58):
+        g.line([(0.74, y), (0.81, y)], 0.03, on="d")
+    g.line([(0.82, 0.28), (0.82, 0.07)], 0.04)
+    g.line([(0.82, 0.68), (0.82, 0.84)], 0.05)
+    g.rrect((0.72, 0.83, 0.92, 0.90), 0.02)
+
+
+def robot_mimic(g):
+    # a crate with a zigzag mouth full of teeth, two eyes, and spindly legs under it
+    for hip, knee, foot in (((0.22, 0.62), (0.10, 0.76), (0.14, 0.92)), ((0.40, 0.64), (0.36, 0.78), (0.38, 0.92)),
+                            ((0.60, 0.64), (0.64, 0.78), (0.62, 0.92)), ((0.78, 0.62), (0.90, 0.76), (0.86, 0.92))):
+        g.line([hip, knee, foot], RS * 0.75)
+    g.rrect((0.08, 0.08, 0.92, 0.66), 0.03)
+    n, x0, x1 = 6, 0.16, 0.84
+    w = (x1 - x0) / n
+    top = []
+    for i in range(n):
+        top += [(x0 + i * w, 0.34), (x0 + (i + 0.5) * w, 0.47)]
+    top.append((x1, 0.34))
+    bottom = [(x1, 0.57)]
+    for i in range(n - 1, 0, -1):
+        bottom += [(x0 + (i + 0.5) * w, 0.57), (x0 + i * w, 0.43)]
+    bottom += [(x0 + 0.5 * w, 0.57), (x0, 0.57)]
+    mouth = top + bottom
+    g.cut(mask_of(g.size, lambda m: (m.poly(mouth), _dot(m, 0.32, 0.21, 0.055), _dot(m, 0.68, 0.21, 0.055))))
+
+
+def robot_salesman(g):
+    # a kiosk robot: a scalloped awning, a booth with a screen face, a megaphone to the right, a price tag on a string
+    g.rrect((0.04, 0.24, 0.62, 0.34), 0.02)
+    for x in (0.11, 0.255, 0.40, 0.545):
+        _dot(g, x, 0.34, 0.072)
+    g.rrect((0.10, 0.46, 0.56, 0.92), 0.04)
+    g.rrect((0.17, 0.53, 0.49, 0.70), 0.03, on="d")
+    _dot(g, 0.27, 0.615, 0.035)
+    _dot(g, 0.39, 0.615, 0.035)
+    g.line([(0.14, 0.79), (0.52, 0.79)], 0.035, on="d")
+    g.line([(0.54, 0.68), (0.64, 0.58)], RS * 0.8)
+    g.poly([(0.60, 0.50), (0.68, 0.50), (0.93, 0.38), (0.93, 0.72), (0.68, 0.60), (0.60, 0.60)])
+    g.line([(0.88, 0.42), (0.88, 0.68)], 0.035, on="d")
+    g.line([(0.60, 0.25), (0.70, 0.18)], 0.03)
+    tag = _rot([(0.68, 0.10), (0.84, 0.10), (0.92, 0.18), (0.84, 0.26), (0.68, 0.26)], 0.80, 0.18, -25)
+    g.poly(tag)
+    hole = _rot([(0.735, 0.18)], 0.80, 0.18, -25)[0]
+    _dot(g, hole[0], hole[1], 0.03, on="d")
+
+
+def robot_gunner(g):
+    # the guard's silhouette (shifted left) holding a rifle across its chest, the barrel out to the right
+    g.rrect((0.24, 0.06, 0.60, 0.32), 0.07)
+    _dot(g, 0.42, 0.19, 0.075, on="d")
+    _dot(g, 0.42, 0.19, 0.03)
+    g.rrect((0.19, 0.36, 0.65, 0.62), 0.07)
+    g.line([(0.32, 0.60), (0.27, 0.75), (0.30, 0.87)], RS)
+    g.line([(0.52, 0.60), (0.57, 0.75), (0.54, 0.87)], RS)
+    g.rrect((0.16, 0.84, 0.36, 0.93), 0.03)
+    g.rrect((0.48, 0.84, 0.68, 0.93), 0.03)
+
+    def gun(m, e):
+        m.rrect((0.30 - e, 0.42 - e, 0.78 + e, 0.52 + e), 0.03 + e)
+        m.rrect((0.76 - e, 0.44 - e, 0.95 + e, 0.49 + e), 0.02 + e)
+        m.poly([(0.48 - e, 0.50), (0.58 + e, 0.50), (0.56 + e, 0.62 + e), (0.46 - e, 0.62 + e)])
+    g.cut(mask_of(g.size, lambda m: gun(m, 0.035)))
+    gun(g, 0.0)
+
+
+def robot_driller(g):
+    # a tracked machine in profile: a cab with a window and an exhaust, a big cone drill pointing right
+    g.rrect((0.04, 0.70, 0.66, 0.92), 0.11)
+    for x in (0.15, 0.29, 0.43, 0.56):
+        _dot(g, x, 0.81, 0.04, on="d")
+    g.rrect((0.20, 0.24, 0.28, 0.42), 0.02)
+    g.rrect((0.10, 0.38, 0.56, 0.70), 0.06)
+    g.rrect((0.18, 0.45, 0.36, 0.58), 0.02, on="d")
+    g.rrect((0.52, 0.46, 0.64, 0.64), 0.02)
+    g.poly([(0.62, 0.34), (0.96, 0.55), (0.62, 0.76)])
+    for x in (0.70, 0.79):
+        h = 0.21 * (0.96 - x) / 0.34
+        g.line([(x - 0.03, 0.55 - h), (x + 0.03, 0.55 + h)], 0.035, on="d")
+
+
+def robot_exterminator(g):
+    # a sprayer: a gas-mask head (two round lenses, a filter snout), a gas tank on its back, a spray wand misting right
+    g.rrect((0.04, 0.40, 0.22, 0.84), 0.09)
+    g.rrect((0.10, 0.34, 0.16, 0.42), 0.01)
+    for y in (0.52, 0.72):
+        g.line([(0.06, y), (0.20, y)], 0.035, on="d")
+    g.rrect((0.28, 0.46, 0.64, 0.80), 0.07)
+    g.rrect((0.32, 0.80, 0.43, 0.94), 0.03)
+    g.rrect((0.49, 0.80, 0.60, 0.94), 0.03)
+    g.ellipse((0.28, 0.06, 0.64, 0.40))
+    _dot(g, 0.385, 0.20, 0.055, on="d")
+    _dot(g, 0.535, 0.20, 0.055, on="d")
+    g.rrect((0.39, 0.30, 0.53, 0.46), 0.04)
+    g.line([(0.40, 0.385), (0.52, 0.385)], 0.03, on="d")
+    g.line([(0.62, 0.58), (0.84, 0.46)], 0.06)
+    g.rrect((0.82, 0.42, 0.90, 0.50), 0.02)
+    for cx, cy, r in ((0.92, 0.32, 0.04), (0.84, 0.28, 0.03), (0.95, 0.42, 0.03)):
+        _dot(g, cx, cy, r)
+
+
+def robot_banshee(g):
+    # a tall thin wailer: a horn for a head (its wide mouth up), a stick body with long arms, sound rings to both sides
+    g.ellipse((0.30, 0.06, 0.70, 0.16))
+    g.poly([(0.31, 0.11), (0.69, 0.11), (0.55, 0.40), (0.45, 0.40)])
+    g.ellipse((0.36, 0.08, 0.64, 0.14), on="d")
+    g.line([(0.50, 0.38), (0.50, 0.70)], RS * 0.8)
+    g.line([(0.50, 0.48), (0.32, 0.58), (0.24, 0.76)], RS * 0.6)
+    g.line([(0.50, 0.48), (0.68, 0.58), (0.76, 0.76)], RS * 0.6)
+    g.line([(0.50, 0.68), (0.42, 0.90)], RS * 0.7)
+    g.line([(0.50, 0.68), (0.58, 0.90)], RS * 0.7)
+    for r in (0.30, 0.42):
+        g.arc((0.50 - r, 0.24 - r, 0.50 + r, 0.24 + r), 150, 210, RS * 0.7)
+        g.arc((0.50 - r, 0.24 - r, 0.50 + r, 0.24 + r), -30, 30, RS * 0.7)
+
+
+def robot_maniac(g):
+    # a lanky hunched figure stalking left: a big sack over its back, a long arm forward with a hook, a hook on the sack
+    g.ellipse((0.56, 0.04, 0.92, 0.44))
+    g.poly([(0.50, 0.14), (0.62, 0.10), (0.62, 0.24)])
+    g.line([(0.34, 0.26), (0.50, 0.18), (0.60, 0.52)], 0.14)
+    _dot(g, 0.27, 0.27, 0.085)
+    _dot(g, 0.24, 0.27, 0.025, on="d")
+    g.line([(0.60, 0.52), (0.52, 0.72), (0.46, 0.92)], RS * 0.85)
+    g.line([(0.60, 0.52), (0.70, 0.72), (0.70, 0.92)], RS * 0.85)
+    g.line([(0.42, 0.28), (0.28, 0.44), (0.24, 0.58)], RS * 0.75)
+    g.line([(0.24, 0.58), (0.24, 0.66)], 0.05)
+    g.arc((0.08, 0.58, 0.24, 0.74), 0, 180, 0.05)
+    g.line([(0.08, 0.66), (0.10, 0.61)], 0.05)
+    g.line([(0.88, 0.40), (0.88, 0.58)], 0.045)
+    g.arc((0.76, 0.52, 0.88, 0.64), 0, 180, 0.045)
+    g.line([(0.76, 0.58), (0.78, 0.53)], 0.045)
 
 
 # ------------------------------------------------------------------ car upgrades (the garage's upgrade bench, 96 px)
@@ -804,7 +998,10 @@ ROBOTS = {
     "robot_vacuum": robot_vacuum, "robot_turret": robot_turret, "robot_thumper": robot_thumper, 
     "robot_sorter": robot_sorter, "robot_worker": robot_worker, "robot_lidar": robot_lidar,
     "robot_motionsensor": robot_motionsensor, "robot_pressureplate": robot_pressureplate, "robot_camera": robot_camera,
-    "robot_sweeper": robot_sweeper, 
+    "robot_sweeper": robot_sweeper,
+    "robot_warden": robot_warden, "robot_repairman": robot_repairman, "robot_smoker": robot_smoker, "robot_relay": robot_relay,
+    "robot_nurse": robot_nurse, "robot_mimic": robot_mimic, "robot_salesman": robot_salesman, "robot_gunner": robot_gunner,
+    "robot_driller": robot_driller, "robot_exterminator": robot_exterminator, "robot_banshee": robot_banshee, "robot_maniac": robot_maniac,
 }
 
 

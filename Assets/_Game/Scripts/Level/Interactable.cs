@@ -10,7 +10,7 @@ namespace Stealth.Level
     /// door's lock (index: the door), a safe's dial (the prop), a storage part (<see cref="OpenKeys.StoragePart"/>: the prop
     /// and its part). <see cref="CarBench"/> — the car's workbench — opens the bench on this peer, the server is not asked.
     /// </summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, CarBench, Door, ExitButton, PetBot, CarPanic }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, CarBench, Door, ExitButton, PetBot, CarPanic, Mimic }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the

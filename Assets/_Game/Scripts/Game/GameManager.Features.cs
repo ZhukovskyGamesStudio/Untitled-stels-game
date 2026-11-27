@@ -110,6 +110,7 @@ namespace Stealth.Game
                 case UseKind.ShaftHatch: ToggleShaftServer(thing is ShaftHatch { Exit: true }); break;
                 case UseKind.VentGrate: UnscrewServer(player, index); break;
                 case UseKind.Door: if (thing is DoorHandle handle) ToggleDoorServer(player, handle.Door); break;
+                case UseKind.Mimic: UseMimicServer(player, thing); break;
                 case UseKind.PetBot: if (thing is StorageBotPet pet && pet.TryGetComponent<StorageBot>(out var bot)) bot.PetServer(); break;
                 default: UseSewerServer(player, kind, index); break;
             }

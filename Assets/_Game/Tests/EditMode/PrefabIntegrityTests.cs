@@ -27,6 +27,11 @@ namespace Stealth.Tests
         static readonly HashSet<string> Optional = new()
         {
             "SecurityCamera.Status.Light",  // the spot light shows the camera's status instead
+            "RobotController.PatchPrefab",  // only the robots that leave goo, smoke or gas
+            "RobotController.Tracer",       // only the robot with a gun
+            "RobotController.Muzzle",
+            "HazardView.Body",              // a puddle has a body, a cloud has particles
+            "HazardView.Cloud",
             "GameNetwork.SteamTransport",
             "CheatPanel.Items.Array.data[0]", "CheatPanel.Items.Array.data[1]", "CheatPanel.Items.Array.data[2]", "CheatPanel.Items.Array.data[3]",
             "CheatPanel.Items.Array.data[4]", "CheatPanel.Items.Array.data[5]", "CheatPanel.Items.Array.data[6]", "CheatPanel.Items.Array.data[7]", // (no buttons for the old tetris pieces)

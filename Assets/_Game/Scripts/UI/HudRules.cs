@@ -233,7 +233,7 @@ namespace Stealth.UI
 
         public static ReticleIcon IconOf(Level.UseKind kind) => kind switch
         {
-            Level.UseKind.Crate => ReticleIcon.Crate,
+            Level.UseKind.Crate or Level.UseKind.Mimic => ReticleIcon.Crate, // (a mimic passes for a crate)
             Level.UseKind.MedTable => ReticleIcon.Heal,
             Level.UseKind.Workbench => ReticleIcon.Craft,
             Level.UseKind.CarBench => ReticleIcon.Craft,

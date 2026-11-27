@@ -316,6 +316,7 @@ namespace Stealth.Player
             }
             UpdateFlashlightView();
             UpdateModelPose();
+            ShowHeld();
             if (!IsOwner) return;
 
             PlaceOnLevelIfNeeded();
@@ -670,6 +671,17 @@ namespace Stealth.Player
             if (Downed || Invisible) return; // the invisibility cheat: robots ignore this player completely
             NoiseSystem.EmitServer(position, Mathf.Min(radius, 20f), ClientId);
             if (radius >= 6f) GameManager.Instance?.NoteServer(this, StatKind.Noise); // (a loud one: a run, a landing, not every step)
+        }
+
+        /// <summary>Server: out at once, whatever the health (a sedative).</summary>
+        public void KnockOutServer(DownCause cause)
+        {
+            if (!IsServer || Downed || Invulnerable) return;
+            m_Health.Knockout(Time.time);
+            DownedBy = cause;
+            HeldSince = Time.time;
+            PublishHealth();
+            GameManager.Instance?.NoteServer(this, StatKind.Downs);
         }
 
         /// <summary>Server: the owner passed out from the gas.</summary>

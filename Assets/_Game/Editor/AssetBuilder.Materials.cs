@@ -297,6 +297,7 @@ namespace Stealth.EditorTools
             Translucent(Mat(props, "StairGlass", new Color(0.72f, 0.86f, 0.95f, 0.22f), smoothness: 0.92f));
             Mat(fx, "Radio", new Color(1f, 0.6f, 0.2f), unlit: true);
             Mat(fx, "Stomp", new Color(1f, 0.75f, 0.25f), unlit: true);
+            DangerMaterials();
 
             for (int i = 0; i < ItemCatalog.Colors.Length; i++)
             {

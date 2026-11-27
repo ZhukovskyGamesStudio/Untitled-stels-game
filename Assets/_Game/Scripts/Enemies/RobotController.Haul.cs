@@ -30,7 +30,25 @@ namespace Stealth.Enemies
         };
 
         /// <summary>Where a kind takes its bodies: the nurse to a hospital bed, a renegade to its lair, the servants to the prison.</summary>
-        public static CaptiveKind PlaceOf(RobotKind kind) => RobotRoster.FactionOf(kind) == Faction.Renegade ? CaptiveKind.Lair : CaptiveKind.Prison;
+        public static CaptiveKind PlaceOf(RobotKind kind) =>
+            kind == RobotKind.Nurse ? CaptiveKind.Ward : RobotRoster.FactionOf(kind) == Faction.Renegade ? CaptiveKind.Lair : CaptiveKind.Prison;
+
+        /// <summary>How high over a hospital bed's pivot a sleeper lies, metres.</summary>
+        public const float BedHeight = 0.6f;
+
+        /// <summary>The nearest hospital bed to <paramref name="from"/> (where a sleeper lies on it), or null in a house without beds.</summary>
+        public static Vector3? NearestBed(LevelLayout l, Vector3 from)
+        {
+            Vector3? best = null;
+            float bestDistance = float.MaxValue;
+            foreach (var p in l.Props)
+            {
+                if (p.Kind != PropKind.HospitalBed) continue;
+                float d = (p.Position - from).sqrMagnitude + (LevelLayout.FloorOf(p.Position.y) != LevelLayout.FloorOf(from.y) ? 10000f : 0f);
+                if (d < bestDistance) { bestDistance = d; best = p.Position + Vector3.up * BedHeight; }
+            }
+            return best;
+        }
     }
 
     /// <summary>
@@ -65,6 +83,9 @@ namespace Stealth.Enemies
         Vector3 HaulPlace(PlayerController body)
         {
             var layout = ActiveLevel.Layout;
+            var place = HaulRules.PlaceOf(Kind);
+            if (place == CaptiveKind.Lair) return m_Home; // a renegade's own corner: where it was put into the house
+            if (place == CaptiveKind.Ward && layout != null && HaulRules.NearestBed(layout, transform.position) is Vector3 bed) return bed;
             if (layout == null || layout.PrisonSpots.Count == 0) return transform.position;
             return layout.PrisonSpots[(int)(body.ClientId % (ulong)layout.PrisonSpots.Count)];
         }

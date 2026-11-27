@@ -30,6 +30,7 @@ namespace Stealth.Tests
                 Assert.AreSame(rc, rig.Robot);
                 var (eyes, ears, ground) = SensorRig.Mounts(rc.Senses);
                 bool lidar = rc.Senses.LidarRange > 0f && rc.Lidar != null && rc.Lidar.Head != null; // the spinning puck shows itself
+                if (rc.Kind == RobotKind.Smoker) continue; // the smoke machine senses nothing: no sensor to show
                 Assert.IsTrue(eyes || ears || ground || lidar, $"{go.name} shows at least one sensor");
                 foreach (var r in rig.Eyes[0].GetComponentsInChildren<Renderer>())
                     if (r.name.StartsWith("Eye")) CollectionAssert.Contains(rc.Status.Renderers, r, $"{go.name}: the eye lens glows in the status colour");

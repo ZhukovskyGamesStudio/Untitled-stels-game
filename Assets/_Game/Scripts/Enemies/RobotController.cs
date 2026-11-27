@@ -94,6 +94,7 @@ namespace Stealth.Enemies
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
             m_Brain.StateChanged += s => SetMode(ModeOf(s));
             m_LootRng = new System.Random(rng.Next());
+            BeginRoleServer();
             NoiseSystem.OnNoise += OnNoise;
             PatrolToNextPoint();
         }
@@ -112,6 +113,7 @@ namespace Stealth.Enemies
             m_Brain?.Reset(Time.time);
             if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.isStopped = true;
             DropHauledServer(); // the body on its back falls where it stands
+            EndRoleErrand();
             EndLootErrand(); // whatever it was lifting or lowering falls in front of it
             DropCargoServer();
         }
@@ -212,6 +214,7 @@ namespace Stealth.Enemies
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
             if (UpdateHaulServer(now, dt)) { }
+            else if (UpdateRoleServer(now, dt)) { }
             else if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
             UpdateDoorways(now, dt);
             HoldOnDock(dt);
@@ -231,6 +234,7 @@ namespace Stealth.Enemies
             {
                 IIntruder target = p;
                 if (target.IsDown) continue;
+                if (Traits.Role == RobotRole.Maniac && m_Prey != Nobody && target.ClientId != m_Prey) continue; // it has eyes for its prey only
                 // (no "contact": a robot touched from behind does not notice it — it notices only with its sensors)
 
                 float rate = 0f;
@@ -371,10 +375,7 @@ namespace Stealth.Enemies
         public void Attack(IIntruder target)
         {
             // not through a shut door (or a wall): what it reaches with is at the chest, what it hits too
-            if (Perception.WallBetween(Feet + Vector3.up * 1.1f, Perception.AimPoint(target, 0.6f))) return;
-            target.HitServer(transform.position, Cause);
-            // down at once: it takes the body away itself
-            if (Traits.CarriesPlayers && target is PlayerController body && body.CanBeCarried) FetchServer(body);
+            AttackServer(target); // by its kind of attack: a hit (not through a shut door or a wall), a net, a shot…
         }
 
         public void RaiseAlarm(Vector3 at, float radius)
@@ -396,6 +397,7 @@ namespace Stealth.Enemies
 
         protected override void OnPulse(byte effect)
         {
+            if (OnRolePulse(effect)) return;
             if (effect == PulseStomp)
             {
                 // The wave on every peer: a ring along the floor, a thump, the body dips.

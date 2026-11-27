@@ -85,6 +85,20 @@ namespace Stealth.Enemies
         public float AttackRange = 1.7f;
         public float AttackCooldown = 1.7f;
 
+        [Header("Role and attack")]
+        [Tooltip("What it does besides its rounds (RobotRole): the numbers below are the role's.")]
+        public RobotRole Role;
+        [Tooltip("Seconds between the role's uses (a puff of smoke, a puddle, a look for a door to shut, news of the maniac's prey).")]
+        public float RolePeriod = 20f;
+        [Tooltip("The role's or the attack's radius, metres (a cloud, a puddle, a shriek, how loud the talk is, how far a door or a grille is noticed).")]
+        public float RoleRadius = 4f;
+        [Tooltip("Seconds the role's or the attack's effect lasts (a cloud, a puddle, a stun).")]
+        public float RoleDuration = 10f;
+        [Tooltip("Uses of the role per house, 0 = no limit (the locks a warden sets again).")]
+        public int RoleLimit;
+        [Tooltip("What it does to the player it has caught up with (AttackKind): AttackRange and AttackCooldown are its reach and pace.")]
+        public AttackKind Attack;
+
         [Header("Carrying players")]
         [Tooltip("A player it knocks out (or one lying near, put down by its side) it lifts and carries away: a servant to the prison, a renegade to its lair.")]
         public bool CarriesPlayers;
@@ -196,6 +210,19 @@ namespace Stealth.Enemies
 
         /// <summary>Where it rests at its dock (its back to the station).</summary>
         public Vector3 DockSpot => m_Dock;
+
+        /// <summary>
+        /// Woken by hand (a mimic a player tried to search): it goes for <paramref name="who"/> at once, and when the hunt
+        /// is over it settles at <paramref name="dock"/> instead of where it stood.
+        /// </summary>
+        public void Wake(IIntruder who, Vector3 dock, float now)
+        {
+            if (!Docked) return;
+            m_Dock = dock;
+            m_HuntUntil = now + m_Traits.AlarmHuntTime;
+            Shift = GuardShift.Hunting;
+            if (who != null && !who.IsDown) Detect(who, now);
+        }
 
         /// <summary>Resting at its dock: no patrol, no senses — only an alarm wakes it.</summary>
         public bool Resting => Docked && Shift == GuardShift.Resting;
@@ -493,8 +520,11 @@ namespace Stealth.Enemies
                     }
                     var to = Target.Position - m_Body.Position;
                     to.y = 0; // flying robots dive at the player
-                    m_Body.MoveTo(LastKnown, m_Traits.ChaseSpeed);
-                    if (m_Traits.CanAttack && to.magnitude <= m_Traits.AttackRange)
+                    bool inReach = m_Traits.CanAttack && to.magnitude <= m_Traits.AttackRange;
+                    // an attack made from afar (a shot, a net, a shriek): it stands while it has them in reach and in its senses
+                    if (inReach && RoleRules.Ranged(m_Traits.Attack) && now - m_LastSense < 1f) m_Body.Stop();
+                    else m_Body.MoveTo(LastKnown, m_Traits.ChaseSpeed);
+                    if (inReach)
                     {
                         m_Body.Face(Target.Position, dt);
                         if (now >= m_NextAttack)

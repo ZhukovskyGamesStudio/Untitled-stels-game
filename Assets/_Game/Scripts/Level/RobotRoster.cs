@@ -19,7 +19,19 @@ namespace Stealth.Level
         MotionSensor = 12,      // wall PIR: notices fast movement
         PressurePlate = 13,     // floor tile: stepping on it raises an alarm
         Camera = 14,            // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
-        Sweeper = 15,           // floor cleaner, blind; a lidar spins at ankle height — stand on a chair or a desk
+        Sweeper = 15,           // floor cleaner, blind; a lidar spins at ankle height — stand on a chair or a desk; leaves sticky goo
+        Warden = 17,            // green: shuts doors, sets hacked locks again; snitches
+        Repairman = 18,         // green: screws crawl-way grilles back on; snitches
+        Smoker = 19,            // green: wanders and puffs smoke; senses nothing
+        Relay = 20,             // yellow device: a loudspeaker in a trapped room calling in a teammate's voice
+        Nurse = 21,             // yellow, hospitals only: sedates and carries to a bed; the sleeper wakes muddled
+        Mimic = 22,             // yellow renegade: a "crate" that wakes when searched
+        Salesman = 23,          // yellow renegade: runs up and talks loudly; draws whoever has ears
+        Gunner = 24,            // red: the guard with a gun, shoots from afar; comes late on the house's clock
+        Driller = 25,           // red: breaks doors open for good
+        Exterminator = 26,      // red: sprays laughing gas round itself
+        Banshee = 27,           // red renegade: blind, hunts by ear, stuns with a shriek
+        Maniac = 28,            // red renegade: stalks one player, carries them to its lair
     }
 
     /// <summary>One line of the security roster: from which house a kind appears and how often.</summary>
@@ -67,7 +79,7 @@ namespace Stealth.Level
     public static class RobotRoster
     {
         /// <summary>Slots of a table by kind (the numbers are saved and travel: 7, 10 and 16 were robots the game no longer has).</summary>
-        public const int KindCount = 16;
+        public const int KindCount = 29;
 
         public static readonly RobotKind[] Kinds = (RobotKind[])System.Enum.GetValues(typeof(RobotKind));
 
@@ -86,6 +98,17 @@ namespace Stealth.Level
             new(RobotKind.Thumper, 2, 2f),
             new(RobotKind.Sorter, 2, 1.5f),
             new(RobotKind.Turret, 2, 1.5f),
+            new(RobotKind.Warden, 0, 2f),
+            new(RobotKind.Nurse, 0, 3f),
+            new(RobotKind.Repairman, 1, 1.5f),
+            new(RobotKind.Smoker, 1, 1.5f),
+            new(RobotKind.Mimic, 1, 1f),
+            new(RobotKind.Salesman, 1, 1.5f),
+            new(RobotKind.Exterminator, 2, 1f),
+            new(RobotKind.Gunner, 3, 1f),
+            new(RobotKind.Driller, 3, 1f),
+            new(RobotKind.Banshee, 3, 1f),
+            new(RobotKind.Maniac, 4, 0.7f),
         };
 
         public static RosterEntry[] DefaultDevices() => new RosterEntry[]
@@ -93,6 +116,7 @@ namespace Stealth.Level
             new(RobotKind.PressurePlate, 0, 2f),
             new(RobotKind.MotionSensor, 0, 2f),
             new(RobotKind.Lidar, 1, 1.5f),
+            new(RobotKind.Relay, 2, 1f),
         };
 
         public static HouseRoster[] DefaultByHouse() => new HouseRoster[]
@@ -103,20 +127,34 @@ namespace Stealth.Level
             new(RobotKind.Sweeper, HouseKind.Hospital, 2f),
             new(RobotKind.Spider, HouseKind.Abandoned, 3f),
             new(RobotKind.Drone, HouseKind.Headquarters, 2f),
+            new(RobotKind.Nurse, HouseKind.Hospital, 1f, true),        // nurses work in hospitals only
+            new(RobotKind.Repairman, HouseKind.Garage, 3f),            // the repair shop's mechanics
+            new(RobotKind.Warden, HouseKind.Apartments, 2.5f),         // the block's concierge
+            new(RobotKind.Warden, HouseKind.Headquarters, 1.5f),
+            new(RobotKind.Salesman, HouseKind.Business, 3f),
+            new(RobotKind.Salesman, HouseKind.Apartments, 1.5f),
+            new(RobotKind.Smoker, HouseKind.Warehouse, 2f),
+            new(RobotKind.Exterminator, HouseKind.Abandoned, 2.5f),
+            new(RobotKind.Exterminator, HouseKind.Hospital, 1.5f),
+            new(RobotKind.Banshee, HouseKind.Abandoned, 2.5f),
+            new(RobotKind.Mimic, HouseKind.Warehouse, 2f),
+            new(RobotKind.Driller, HouseKind.Garage, 2f),
+            new(RobotKind.Gunner, HouseKind.Headquarters, 2f),
         };
 
         /// <summary>The zone a kind belongs to: it stands in rooms at least this dangerous (<see cref="DangerZones"/>).</summary>
         public static DangerZone ZoneOf(RobotKind k) => k switch
         {
-            RobotKind.Worker or RobotKind.Sweeper or RobotKind.Listener or RobotKind.Lidar => DangerZone.Green,
-            RobotKind.Turret => DangerZone.Red,
+            RobotKind.Worker or RobotKind.Sweeper or RobotKind.Listener or RobotKind.Lidar
+                or RobotKind.Warden or RobotKind.Repairman or RobotKind.Smoker => DangerZone.Green,
+            RobotKind.Turret or RobotKind.Gunner or RobotKind.Driller or RobotKind.Exterminator or RobotKind.Banshee or RobotKind.Maniac => DangerZone.Red,
             _ => DangerZone.Yellow,
         };
 
         /// <summary>Whose side a kind is on.</summary>
         public static Faction FactionOf(RobotKind k) => k switch
         {
-            RobotKind.Spider => Faction.Renegade,
+            RobotKind.Spider or RobotKind.Mimic or RobotKind.Salesman or RobotKind.Banshee or RobotKind.Maniac => Faction.Renegade,
             _ => Faction.Servant,
         };
 
@@ -176,7 +214,8 @@ namespace Stealth.Level
             var allowed = new System.Collections.Generic.List<RosterEntry>();
             foreach (var e in table)
             {
-                if (e.MinLevel > level || e.Weight <= 0f || IsDevice(e.Kind) || e.Kind is RobotKind.Worker or RobotKind.Camera) continue;
+                // (the armed guard has its own minute on the clock: Game.Escalation)
+                if (e.MinLevel > level || e.Weight <= 0f || IsDevice(e.Kind) || e.Kind is RobotKind.Worker or RobotKind.Camera or ArmedGuard) continue;
                 var zone = ZoneOf(e.Kind);
                 if (zone == DangerZone.Green || zone > tier || FactionOf(e.Kind) == Faction.Renegade) continue;
                 var scaled = e;
@@ -188,13 +227,13 @@ namespace Stealth.Level
         }
 
         /// <summary>Who comes late on the house's clock (Game.Escalation): the guard with a gun.</summary>
-        public const RobotKind ArmedGuard = RobotKind.Guard;
+        public const RobotKind ArmedGuard = RobotKind.Gunner;
 
-        public static bool IsDevice(RobotKind k) => k == RobotKind.Lidar || k == RobotKind.MotionSensor || k == RobotKind.PressurePlate;
+        public static bool IsDevice(RobotKind k) => k == RobotKind.Lidar || k == RobotKind.MotionSensor || k == RobotKind.PressurePlate || k == RobotKind.Relay;
 
         /// <summary>Robots with legs / propellers can change floors; wheels, tracks and fixed devices cannot.</summary>
         public static bool CanUseStairs(RobotKind k) =>
-            k is RobotKind.Guard or RobotKind.Drone or RobotKind.Sorter;
+            k is RobotKind.Guard or RobotKind.Drone or RobotKind.Sorter or RobotKind.Gunner or RobotKind.Maniac or RobotKind.Repairman or RobotKind.Mimic or RobotKind.Banshee;
 
         public static RobotKind PickRobot(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Robots, level, rng);
 

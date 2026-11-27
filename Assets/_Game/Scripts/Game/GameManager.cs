@@ -428,6 +428,7 @@ namespace Stealth.Game
             HouseClockAt = 0;
             BeginHouseDangerServer();
             BeginHouseCaptivesServer();
+            BeginHouseRolesServer();
             Hazards.Clear();
             FrameBudget.Step = "the old house's things despawned";
             BeginHouseStatsServer();
@@ -557,7 +558,7 @@ namespace Stealth.Game
             {
                 var spawn = layout.RobotSpawns[si];
                 var pos = spawn.Position;
-                bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind == RobotKind.Lidar;
+                bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind is RobotKind.Lidar or RobotKind.Relay;
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
                 // (its exact spot at the dock, not the navmesh's nearest: the dock's own carving would push it aside)

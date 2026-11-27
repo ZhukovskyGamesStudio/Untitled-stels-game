@@ -1177,7 +1177,8 @@ namespace Stealth.Level
             var table = s.Roster.Robots;
             var freshRobots = RobotRoster.Newcomers(table, level);
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
-            for (int i = 0; i < robots; i++)
+            // (a house that introduces more kinds than it has robots still shows each of them)
+            for (int i = 0; i < (robots > 0 ? Mathf.Max(robots, freshRobots.Count) : 0); i++)
             {
                 // the house that introduces a kind shows it, in a room dangerous enough for it
                 bool fresh = i < freshRobots.Count && RobotRoster.HouseScale(freshRobots[i], l.Kind, s.Roster.ByHouse) > 0f;
@@ -1271,6 +1272,10 @@ namespace Stealth.Level
                     if ((room.Floor != 0 || Vector3.Distance(pos, hatch) >= MinDeviceDistanceToHatch) && (tries >= 12 || !CalmRoom(room))) break;
                 }
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = rot });
+                // a relay lures into a room with traps: two plates on its floor, between the ways in and the relay
+                if (kind == RobotKind.Relay)
+                    for (int k = 0; k < 2; k++)
+                        l.RobotSpawns.Add(new RobotSpawn { Kind = RobotKind.PressurePlate, Floor = room.Floor, Position = SpotIn(l, room, rng, 2f), Rotation = Quaternion.identity });
             }
 
             int cameras = s.CamerasFor(l.FloorArea, level, l.Players);
