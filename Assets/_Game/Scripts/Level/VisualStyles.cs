@@ -456,7 +456,7 @@ namespace Stealth.Level
         public static bool Invariant(Renderer r)
         {
             var d = r.GetComponentInParent<Enemies.Detector>(true);
-            if (d != null) return d.Kind != RobotKind.Spider;
+            if (d != null) return !Styled.Contains("robot_" + d.Kind.ToString().ToLowerInvariant());
             return r.GetComponentInParent<Enemies.LaserGate>(true) != null;
         }
 
@@ -465,8 +465,18 @@ namespace Stealth.Level
         /// their style versions (the spider and its web keep theirs).
         /// </summary>
         public static bool Creature(string model) =>
-            model != "robot_spider" && (model.StartsWith("robot_") || model.StartsWith("sensor_") || model.StartsWith("attach_")
+            !Styled.Contains(model) && (model.StartsWith("robot_") || model.StartsWith("sensor_") || model.StartsWith("attach_")
                 || model == "security_camera" || model == "laser_emitter" || model == "worker_lift");
+
+        /// <summary>
+        /// The robots that do have a version in every style (Tools/Blender/build_bestiary.py): the spider and the robots
+        /// of the danger zones. The old creature robots stay the same everywhere.
+        /// </summary>
+        public static readonly HashSet<string> Styled = new()
+        {
+            "robot_spider", "robot_warden", "robot_repairman", "robot_smoker", "robot_relay", "robot_nurse", "robot_mimic",
+            "robot_salesman", "robot_gunner", "robot_driller", "robot_exterminator", "robot_banshee", "robot_maniac",
+        };
 
         /// <summary>The robots' own materials (the charging room): never recoloured by a style's palette.</summary>
         static bool RobotMade(Material m) => m.name.StartsWith("RobotShell") || m.name.StartsWith("RobotFlesh") || m.name.StartsWith("RobotGlow");

@@ -500,7 +500,7 @@ namespace Stealth.Tests
             }
             // the robots are creatures of their own, the same in every style (VisualStyles.Invariant): only the spider has
             // its style versions (Tools/Blender/build_bestiary.py) — every part of it, or the original would show through
-            string[] robots = { "robot_spider" };
+            string[] robots = VisualStyles.Styled.ToArray();
             foreach (var m in config.StyleModels.Concat<object>(config.Meshes))
             {
                 var from = m is StyleMeshes sm ? sm.From : ((MeshVariants)m).From;
