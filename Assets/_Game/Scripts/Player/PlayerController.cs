@@ -68,6 +68,14 @@ namespace Stealth.Player
         /// <summary>The head's turn as shown here: the owner's own, a remote player's eased to what came over the network.</summary>
         public float ShownLookYaw => IsOwner && Motor != null ? Motor.HeadYaw : m_ShownYaw;
         float m_ShownYaw;
+        /// <summary>
+        /// Owner-owned: the owner's camera as it is, in the body's own space (its place off the player's position, its turn
+        /// off the player's rotation: head height, bob, landing dip, shake, the look; a terminal's picture too) and its field
+        /// of view — a knocked-out teammate watching this player sees exactly through these eyes.
+        /// </summary>
+        public Vector3 ViewOffset { get; private set; } = new(0f, 1.6f, 0f);
+        public Quaternion ViewTurn { get; private set; } = Quaternion.identity;
+        public float ViewFov { get; private set; } = 70f;
         /// <summary>Owner-owned: Steam name or empty.</summary>
         public string DisplayName { get; private set; } = "";
         public string Nick => DisplayName.Length > 0 ? DisplayName : Loc.F("player.nick", ClientId + 1);
@@ -288,6 +296,25 @@ namespace Stealth.Player
             LookYaw = lookYaw;
             DisplayName = displayName ?? "";
             Pose = pose;
+        }
+
+        /// <summary>Other peers: the owner's camera (<see cref="ViewOffset"/>, <see cref="ViewTurn"/>, <see cref="ViewFov"/>).</summary>
+        public void ApplyView(Vector3 offset, Quaternion turn, float fov)
+        {
+            ViewOffset = offset;
+            ViewTurn = turn;
+            ViewFov = fov;
+        }
+
+        /// <summary>Owner, after the view is placed for the frame: the camera in the body's space, for the teammates watching.</summary>
+        void PublishView()
+        {
+            var cam = Camera.transform;
+            var body = transform.rotation;
+            var inverse = Quaternion.Inverse(body);
+            ViewOffset = inverse * (cam.position - transform.position);
+            ViewTurn = inverse * cam.rotation;
+            ViewFov = Camera.fieldOfView;
         }
 
         /// <summary>Team colour on the small things only, the department's clothes, skin, dark details (PlayerLooks).</summary>
@@ -559,7 +586,10 @@ namespace Stealth.Player
         /// <summary>Owner, knocked out: the teammate whose eyes the camera looks through (null = our own, lying on the floor).</summary>
         public PlayerController Watching { get; private set; }
         int m_WatchIndex;
-        Quaternion m_WatchRotation;
+        Vector3 m_WatchOffset;
+        Quaternion m_WatchTurn = Quaternion.identity;
+        /// <summary>The local player looks through this one's eyes now (knocked out, watching): their head is out of the way.</summary>
+        bool WatchedHere => !IsOwner && Local != null && Local.Watching == this;
         static readonly List<PlayerController> s_Mates = new();
 
         void LateUpdate()
@@ -578,6 +608,7 @@ namespace Stealth.Player
             }
             // through a teammate's eyes the body lying on the floor is seen like anyone's; on the start screen the team stands in a row
             ShowOwnBody(Watching != null || picking);
+            if (Watching == null) PublishView(); // (watching, the camera is someone else's: the last own view stays)
         }
 
         /// <summary>
@@ -589,6 +620,10 @@ namespace Stealth.Player
             var car = Vehicles.Car.Active;
             if (SeatIndex < 0 || car == null || !car.Scripted || SeatIndex >= car.Seats.Length || car.Seats[SeatIndex] == null) return;
             transform.SetPositionAndRotation(car.Seats[SeatIndex].position - Vector3.up * SeatDrop, car.transform.rotation);
+            // …and the body on its seat again now that the player is: it was put there in Update, off where the network's
+            // transform had the player (behind the car) or the frame before — a frame's drive off the seat; while the next
+            // house is built under the drive the frames are long, and the teammate shook about the car by metres
+            FollowRig();
         }
 
         // ------------------------------------------------------------------ server

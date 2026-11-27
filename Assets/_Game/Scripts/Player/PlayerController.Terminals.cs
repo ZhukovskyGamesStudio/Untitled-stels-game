@@ -249,8 +249,10 @@ namespace Stealth.Player
         }
 
         /// <summary>
-        /// Knocked out with a teammate still standing: the camera rides with them (their position, yaw and the synced head
-        /// pitch); the mouse buttons switch between teammates. Back on your feet, the camera is yours again.
+        /// Knocked out with a teammate still standing: the camera is theirs — exactly where their own camera is in their body
+        /// (<see cref="ViewOffset"/>, <see cref="ViewTurn"/>, <see cref="ViewFov"/>: the head's height, bob, dip, shake, the
+        /// look, a terminal's picture), and their head is not in the way (<see cref="UpdateOwnLook"/>); the mouse buttons
+        /// switch between teammates. Back on your feet, the camera is yours again.
         /// </summary>
         void UpdateWatching()
         {
@@ -274,13 +276,13 @@ namespace Stealth.Player
                 if (mouse.rightButton.wasPressedThisFrame) m_WatchIndex--;
             }
             var mate = s_Mates[(m_WatchIndex % s_Mates.Count + s_Mates.Count) % s_Mates.Count];
-            float eye = mate.InHatch ? 0.25f : mate.Downed ? 0.35f : mate.Crouching ? 0.95f : 1.6f;
-            var look = mate.transform.rotation * Quaternion.Euler(mate.LookPitch, mate.ShownLookYaw, 0f); // (their head turned off the held body too)
-            m_WatchRotation = Watching == mate ? Quaternion.Slerp(m_WatchRotation, look, 1f - Mathf.Exp(-12f * Time.deltaTime)) : look;
+            if (Watching == mate) PlayerRules.FollowView(ref m_WatchOffset, ref m_WatchTurn, mate.ViewOffset, mate.ViewTurn, Time.deltaTime);
+            else { m_WatchOffset = mate.ViewOffset; m_WatchTurn = mate.ViewTurn; }
             Watching = mate;
-            // A little in front of their face: the camera does not look out from inside their head.
-            var pos = mate.transform.position + Vector3.up * eye + m_WatchRotation * Vector3.forward * 0.18f;
-            Camera.transform.SetPositionAndRotation(pos, m_WatchRotation);
+            // in their body's space: the camera stays in the head of the body as it is shown here
+            var body = mate.transform;
+            Camera.transform.SetPositionAndRotation(body.position + body.rotation * m_WatchOffset, body.rotation * m_WatchTurn);
+            Camera.fieldOfView = mate.ViewFov; // (the motor sets our own again once we are up)
         }
 
         /// <summary>

@@ -58,6 +58,8 @@ namespace Stealth.Tests
             Assert.AreEqual(SecurityPalette.Alarm, SecurityPalette.ForState(RobotState.Chase, idle));
             Assert.AreEqual(SecurityPalette.Alarm, SecurityPalette.ForState(RobotState.Alerted, idle));
             Assert.AreNotEqual(SecurityPalette.Hacked, SecurityPalette.Calm, "a hacked robot looks dead");
+            Color.RGBToHSV(SecurityPalette.Motion, out float hue, out _, out _);
+            Assert.That(hue, Is.InRange(0.72f, 0.85f), "a calm motion sensor glows purple, not a camera's blue");
         }
 
         static Glimpse Look(float distance = 5f, float exposure = 1f, float offCentre = 0f, bool crouching = false, bool moving = true, float light = 1f) =>

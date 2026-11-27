@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Stealth.Player;
+using UnityEngine;
 
 namespace Stealth.Tests
 {
@@ -112,6 +113,28 @@ namespace Stealth.Tests
             Assert.AreEqual(0f, FootstepNoise.LandingRadius(2f), "stepping down a stair");
             Assert.Greater(FootstepNoise.LandingRadius(9f), FootstepNoise.LandingRadius(4f));
             Assert.AreEqual(14f, FootstepNoise.LandingRadius(20f), 1e-4f, "capped");
+        }
+
+        [Test]
+        public void AWatchedViewIsFollowedSmoothlyAndACutAtOnce()
+        {
+            var offset = new Vector3(0f, 1.6f, 0f);
+            var turn = Quaternion.identity;
+            var bob = new Vector3(0.02f, 1.63f, 0f);
+            var look = Quaternion.Euler(-20f, 0f, 0f);
+            PlayerRules.FollowView(ref offset, ref turn, bob, look, 1f / 120f);
+            Assert.Greater(offset.y, 1.6f, "on its way");
+            Assert.Less(offset.y, 1.63f, "not a jump between network updates");
+            Assert.Greater(Quaternion.Angle(Quaternion.identity, turn), 0f);
+            for (int i = 0; i < 60; i++) PlayerRules.FollowView(ref offset, ref turn, bob, look, 1f / 120f);
+            Assert.AreEqual(bob.y, offset.y, 1e-3f, "half a second later: exactly their eyes");
+            Assert.Less(Quaternion.Angle(look, turn), 0.1f);
+
+            var screen = new Vector3(6f, 2.5f, 4f); // a terminal's picture through a security camera
+            var lens = Quaternion.Euler(30f, 90f, 0f);
+            PlayerRules.FollowView(ref offset, ref turn, screen, lens, 1f / 120f);
+            Assert.AreEqual(screen, offset, "a cut, no flight through the walls");
+            Assert.AreEqual(lens, turn);
         }
     }
 }

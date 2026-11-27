@@ -254,5 +254,27 @@ namespace Stealth.Player
         /// </summary>
         public static float FlashlightNear(float distance, float near) =>
             near <= 0f ? 1f : Mathf.Clamp(distance * distance / (near * near), 0.01f, 1f);
+
+        /// <summary>How fast a watched teammate's view is followed between its network updates, 1/s (they come ~30 a second).</summary>
+        public const float WatchEase = 30f;
+        /// <summary>A view this far from the shown one is a cut (a terminal's picture, another camera on it), metres: no glide.</summary>
+        public const float WatchCut = 1f;
+
+        /// <summary>
+        /// A knocked-out player's camera through a teammate's eyes (pure): the shown view (in the teammate's body space) eased
+        /// toward the last one that came over the network — smooth between updates, a cut taken at once.
+        /// </summary>
+        public static void FollowView(ref Vector3 offset, ref Quaternion turn, Vector3 wantOffset, Quaternion wantTurn, float dt)
+        {
+            if ((wantOffset - offset).sqrMagnitude > WatchCut * WatchCut)
+            {
+                offset = wantOffset;
+                turn = wantTurn;
+                return;
+            }
+            float k = 1f - Mathf.Exp(-WatchEase * Mathf.Max(0f, dt));
+            offset = Vector3.Lerp(offset, wantOffset, k);
+            turn = Quaternion.Slerp(turn, wantTurn, k);
+        }
     }
 }

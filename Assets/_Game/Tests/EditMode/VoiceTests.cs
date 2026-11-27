@@ -211,8 +211,9 @@ namespace Stealth.Tests
                 prevSlope = slope;
             }
             Assert.Greater(VoiceAcoustics.DistanceGain(20f, S), 0.2f, "20 m away: clearly heard");
-            Assert.Greater(VoiceAcoustics.DistanceGain(40f, S), 0.05f, "40 m: still there");
-            Assert.GreaterOrEqual(S.MaxDistance, 50f);
+            Assert.Greater(VoiceAcoustics.DistanceGain(40f, S), 0.2f, "40 m away: still clearly heard (twice the old reach)");
+            Assert.Greater(VoiceAcoustics.DistanceGain(80f, S), 0.05f, "80 m: still there");
+            Assert.GreaterOrEqual(S.MaxDistance, 100f);
             // a wall coming between: the gain glides there in about Smoothing seconds instead of jumping
             float v = 1f;
             v = VoiceAcoustics.Follow(v, 0.1f, 0.016f, S.Smoothing);

@@ -68,6 +68,7 @@ namespace Stealth.Player
                 }
             }
             UpdateBodyPose();
+            if (!IsOwner) UpdateOwnLook(); // (watched through its eyes or not: the plain model too)
             if (m_Rig == null) return;
             UpdateBootsWorn();
             UpdateOwnLook();
@@ -76,11 +77,14 @@ namespace Stealth.Player
             // the hand's thing: everyone sees it carried in the rig's right hand (the owner keeps the first-person one)
             var held = HeldThing != null ? HeldThing.transform.parent : null;
             bool holding = held != null && held.gameObject.activeSelf;
-            m_Rig.Held = IsOwner ? null : held;
+            m_Rig.Held = IsOwner && !m_BodyShown ? null : held; // (the owner's own too while the body is seen: the start screen)
             m_Rig.Cupped = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
-            // the owner looks out of his own body: it hangs from his eyes, and its right arm gives way to the view's hand
+            // the owner looks out of his own body: it hangs from his eyes, and its right arm gives way to the view's hand;
+            // a knocked-out teammate looking through these eyes sees the body under them the same way (not in a seat: there
+            // the rig moves the eyes, and the watcher's camera follows the owner's own)
             bool inside = IsOwner && !m_BodyShown;
-            m_Rig.Eyes = inside && Camera != null ? Camera.transform : null;
+            var watcher = WatchedHere && SeatIndex < 0 ? Local.Camera : null;
+            m_Rig.Eyes = inside && Camera != null ? Camera.transform : watcher != null ? watcher.transform : null;
             m_Rig.HideRightArm = inside && ((HeldHand != null && HeldHand.activeSelf) || (ViewFlashlight != null && ViewFlashlight.activeSelf));
             HoldTheWheel();
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside, ShownLookYaw);
@@ -146,7 +150,11 @@ namespace Stealth.Player
         {
             if (m_Rig == null) return;
             PlayerLooks.Paint(m_Rig.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
-            if (!IsOwner) return;
+            if (!IsOwner)
+            {
+                if (m_OwnLook != -1) m_OwnLook = -2; // looked out of here once: the new renderers are drawn anew
+                return;
+            }
             if (!m_ShownCalling) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.gameObject.layer = OwnBodyLayer;
             m_OwnLook = -1;
             UpdateOwnLook();
@@ -156,17 +164,25 @@ namespace Stealth.Player
         int m_OwnLook = -1;
 
         /// <summary>
-        /// Owner: how the own body is drawn now. Looking out of it: no head (a shadow only) and the skin without one
+        /// How the body is drawn for whoever looks out of it now — its owner, or a knocked-out teammate watching through
+        /// its eyes (<see cref="WatchedHere"/>). Looking out of it: no head (a shadow only) and the skin without one
         /// (<see cref="HumanRig.OwnSkin"/>); with the flashlight on, no shadow of it either — the beam starts at the head and
         /// threw the owner's own shadow before him (the culling mask does not keep casters out of it in Forward+).
+        /// Anyone else's body, not watched, is drawn whole.
         /// </summary>
         void UpdateOwnLook()
         {
-            if (!IsOwner || m_Rig == null) return;
-            int look = (m_BodyShown ? 1 : 0) | (FlashlightOn ? 2 : 0);
+            if (IsOwner && m_Rig == null) return; // (the owner's plain model: ShowOwnBody)
+            bool shown = IsOwner ? m_BodyShown : !WatchedHere;
+            if (!IsOwner && shown && m_OwnLook == -1) return; // never looked out of here: as the prefab has it
+            int look = (shown ? 1 : 0) | (FlashlightOn && !shown ? 2 : 0) | (m_Rig != null ? 4 : 0);
             if (look == m_OwnLook) return;
             m_OwnLook = look;
-            bool shown = m_BodyShown, beam = FlashlightOn && !shown;
+            bool beam = FlashlightOn && !shown;
+            if (!IsOwner) // the plain model, a shadow only like the owner's own (a style with a rigged human hides it anyway)
+                foreach (var r in BodyRenderers)
+                    if (r != null) r.shadowCastingMode = shown ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            if (m_Rig == null) return;
             foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true))
             {
                 if (r == m_Rig.OwnSkin) { r.enabled = !shown; continue; }
@@ -216,10 +232,11 @@ namespace Stealth.Player
         void UpdateViewArm()
         {
             if (m_ArmFist == null) return;
-            bool cup = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
-            if (m_ArmFist.activeSelf == cup) m_ArmFist.SetActive(!cup);
-            if (m_ArmCup.activeSelf != cup) m_ArmCup.SetActive(cup);
-            bool torch = ViewFlashlight != null && ViewFlashlight.activeSelf;
+            // (none while the body is seen whole: the start screen — the body's own hand holds the thing)
+            bool view = !m_BodyShown, cup = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
+            if (m_ArmFist.activeSelf != (view && !cup)) m_ArmFist.SetActive(view && !cup);
+            if (m_ArmCup.activeSelf != (view && cup)) m_ArmCup.SetActive(view && cup);
+            bool torch = view && ViewFlashlight != null && ViewFlashlight.activeSelf;
             if (m_ArmTorch != null && m_ArmTorch.activeSelf != torch) m_ArmTorch.SetActive(torch);
         }
 

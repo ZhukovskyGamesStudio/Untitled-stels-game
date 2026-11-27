@@ -90,7 +90,7 @@ namespace Stealth.EditorTools
             });
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
             {
-                s.HasEyes = false; s.HearingMultiplier = 1.6f;
+                s.HasEyes = false; s.HearingMultiplier = 1.6f; s.HearingSpeed = 0.25f; // hears far, makes sure slowly
                 t.CanUseStairs = false; // wheels
                 t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 3.2f; t.ChaseSpeed = 4.5f; t.LoseTargetAfter = 3f;
             }));

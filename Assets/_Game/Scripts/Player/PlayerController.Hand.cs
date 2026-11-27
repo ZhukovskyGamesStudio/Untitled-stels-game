@@ -150,7 +150,15 @@ namespace Stealth.Player
             var inv = GetComponent<PlayerInventory>();
             int hand = inv != null ? inv.HandIndex() : -1;
             int shape = -1, color = 0;
-            if (hand >= 0 && !Downed && !InHatch && UsingTerminal == null && SeatIndex < 0)
+            var game = GameManager.Instance;
+            if (game != null && game.Picking)
+            {
+                // the run's start screen: the extra item picked is in the hand already — the team in the row sees what
+                // everyone takes (the backpack gets it when the run starts: GiveLoadoutServer)
+                shape = Items.ItemCatalog.StartItems[Mathf.Clamp(LoadoutItem, 0, Items.ItemCatalog.StartItems.Length - 1)];
+                color = Items.ItemCatalog.FreshColor(shape, 0);
+            }
+            else if (hand >= 0 && !Downed && !InHatch && UsingTerminal == null && SeatIndex < 0)
             {
                 var e = inv.Items[hand];
                 if (e.Shape != Items.ItemCatalog.Flashlight && e.Shape != Items.ItemCatalog.ShelterMap) { shape = e.Shape; color = e.Color; }
@@ -163,7 +171,9 @@ namespace Stealth.Player
                 TabletOpen = false;
                 anchor.transform.SetLocalPositionAndRotation(m_HolderPos, m_HolderRot);
             }
-            if (HeldHand != null && HeldHand.activeSelf != (show && IsOwner)) HeldHand.SetActive(show && IsOwner);
+            // the view's own hand only while looking out of the body (on the start screen the body holds it: UpdateRig)
+            bool viewHand = show && IsOwner && !m_BodyShown;
+            if (HeldHand != null && HeldHand.activeSelf != viewHand) HeldHand.SetActive(viewHand);
             if (!show) return;
             if (shape != m_HeldShape || color != m_HeldColor) ShowHeld(shape, color);
             if (IsOwner) UpdateRaise(anchor);

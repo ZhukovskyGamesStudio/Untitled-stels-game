@@ -31,6 +31,9 @@ namespace Stealth.Enemies
         [Tooltip("Hears a noise this many times its radius away (0 = deaf). Each heard noise adds suspicion by its loudness " +
                  "at the robot; walls, doors and slabs muffle it (Data/Config/Perception).")]
         public float HearingMultiplier;
+        [Tooltip("How fast what it hears makes it suspicious: each heard noise adds this share of its suspicion " +
+                 "(1 = as loud as it is; 0.25 = four times as many noises before it is sure).")]
+        public float HearingSpeed = 1f;
 
         [Header("Other")]
         [Tooltip("Seismic: stomps the floor and a wave runs out to this range along its floor, through walls (0 = no seismic sensor). " +
@@ -336,7 +339,7 @@ namespace Stealth.Enemies
         public void OnNoise(Vector3 position, float suspicion, IIntruder source, float now)
         {
             if (m_Senses.HearingMultiplier <= 0f) return;
-            OnStimulus(position, suspicion, source, now);
+            OnStimulus(position, suspicion * Mathf.Max(0f, m_Senses.HearingSpeed), source, now);
         }
 
         /// <summary>A floor wave caught a moving player (seismic): like a noise, but felt through walls.</summary>

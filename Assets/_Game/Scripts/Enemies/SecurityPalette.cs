@@ -13,6 +13,8 @@ namespace Stealth.Enemies
         public static readonly Color Hacked = new(0.12f, 0.12f, 0.12f);
         /// <summary>A robot that hears: its ear lamps glow this while it is calm (the eyes glow <see cref="Calm"/>).</summary>
         public static readonly Color Hearing = new(1f, 0.74f, 0.18f);
+        /// <summary>A motion sensor's lens and light while it is calm: purple — told apart from a camera's pale blue at a glance.</summary>
+        public static readonly Color Motion = new(0.7f, 0.2f, 1f);
         /// <summary>A lamp that does not glow: dark glass.</summary>
         public static readonly Color Off = new(0.05f, 0.055f, 0.06f);
 

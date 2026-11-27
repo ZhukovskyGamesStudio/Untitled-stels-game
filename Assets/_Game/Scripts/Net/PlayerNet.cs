@@ -39,6 +39,10 @@ namespace Stealth.Net
         /// <summary>The head's turn off the held body (the ladder, a seat), degrees (PlayerController.LookYaw).</summary>
         readonly NetworkVariable<sbyte> m_LookYaw = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<byte> m_Gas = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>The owner's camera in the body's space and its field of view (PlayerController.ViewOffset/ViewTurn/ViewFov): a knocked-out teammate looks through it.</summary>
+        readonly NetworkVariable<Vector3> m_ViewOffset = new(new Vector3(0f, 1.6f, 0f), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        readonly NetworkVariable<Quaternion> m_ViewTurn = new(Quaternion.identity, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        readonly NetworkVariable<ushort> m_ViewFov = new(700, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         /// <summary>What the body is busy with (PlayerController.Pose: a ladder, a terminal, work with the hands) — the rigged human's take.</summary>
         readonly NetworkVariable<byte> m_Pose = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -80,6 +84,10 @@ namespace Stealth.Net
             m_Name.OnValueChanged += (_, _) => Pull();
             m_Identity.OnValueChanged += (_, now) => m_Player.ApplyIdentity(now.ToString());
             m_Gas.OnValueChanged += (_, now) => { if (!IsOwner) m_Player.ApplyGas(now); };
+            m_ViewOffset.OnValueChanged += (_, _) => PullView();
+            m_ViewTurn.OnValueChanged += (_, _) => PullView();
+            m_ViewFov.OnValueChanged += (_, _) => PullView();
+            PullView();
             PushState();
             if (!IsOwner) m_Player.ApplyIdentity(m_Identity.Value.ToString());
             Pull();
@@ -119,6 +127,7 @@ namespace Stealth.Net
             NetSync.Set(m_LookYaw, m_Player.LookYaw);
             NetSync.Set(m_Pose, (byte)m_Player.Pose);
             NetSync.Set(m_Gas, (byte)Mathf.RoundToInt(Mathf.Clamp01(m_Player.GasShare) * 255f));
+            PushView();
             if (m_PushedIdentity != m_Player.Identity)
             {
                 m_PushedIdentity = m_Player.Identity;
@@ -127,6 +136,24 @@ namespace Stealth.Net
             if (m_PushedName == m_Player.DisplayName) return;
             m_PushedName = m_Player.DisplayName;
             m_Name.Value = new FixedString32Bytes(m_PushedName);
+        }
+
+        /// <summary>
+        /// Owner: the camera, when it moved more than the eye can tell (a millimetre, a tenth of a degree) — standing still
+        /// sends nothing; walking, the bob goes out every tick.
+        /// </summary>
+        void PushView()
+        {
+            var offset = m_Player.ViewOffset;
+            var turn = m_Player.ViewTurn;
+            if ((offset - m_ViewOffset.Value).sqrMagnitude > 1e-6f) m_ViewOffset.Value = offset;
+            if (Quaternion.Angle(turn, m_ViewTurn.Value) > 0.1f) m_ViewTurn.Value = turn;
+            NetSync.Set(m_ViewFov, (ushort)Mathf.Clamp(Mathf.RoundToInt(m_Player.ViewFov * 10f), 10, 1790)); // tenths of a degree
+        }
+
+        void PullView()
+        {
+            if (!IsOwner) m_Player.ApplyView(m_ViewOffset.Value, m_ViewTurn.Value, m_ViewFov.Value * 0.1f);
         }
 
         void Pull()

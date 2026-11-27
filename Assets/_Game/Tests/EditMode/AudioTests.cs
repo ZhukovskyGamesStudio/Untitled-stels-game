@@ -111,6 +111,15 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheSewersSquelchIsHalfAStep()
+        {
+            var mix = new AudioMix();
+            Assert.AreEqual(0.5f, AudioRules.SurfaceVolume(StepSurface.Wet, mix), 1e-4f);
+            Assert.AreEqual(1f, AudioRules.SurfaceVolume(StepSurface.Concrete, mix));
+            Assert.AreEqual(StepSurface.Wet, StepSurfaces.OfMaterial("SewerConcrete"), "the sewer floor is the wet one");
+        }
+
+        [Test]
         public void DetectorsBeepWhenTheyNoticeAndWhenTheyGiveUp()
         {
             Assert.AreEqual(0, AudioRules.AlertLevel(0.1f, false, false));

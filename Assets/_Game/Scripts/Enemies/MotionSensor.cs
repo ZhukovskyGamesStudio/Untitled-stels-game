@@ -15,7 +15,7 @@ namespace Stealth.Enemies
         public MotionSensorProfile Profile;
         protected override DeviceProfile Device => Profile;
 
-        protected override Color IdleColor => SecurityPalette.Calm; // it watches for movement: a visual sensor, blue
+        protected override Color IdleColor => SecurityPalette.Motion; // purple: not a camera (they look alike on the wall)
 
         public static bool Triggers(float playerSpeed, float threshold) => playerSpeed > threshold;
 

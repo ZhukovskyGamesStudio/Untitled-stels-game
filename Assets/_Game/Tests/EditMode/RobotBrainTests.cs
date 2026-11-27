@@ -238,6 +238,18 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ASlowEarNeedsFourTimesTheNoise()
+        {
+            var slow = new RobotBrain(new RobotSenses { HearingMultiplier = 1f, HearingSpeed = 0.25f }, m_Traits, new FakeBody(), new System.Random(1));
+            var spot = new Vector3(0, 0, 3);
+            for (int i = 0; i < 4; i++) slow.OnNoise(spot, 0.3f, m_Player, m_Now);
+            Assert.AreEqual(0.3f, slow.Suspicion, 1e-4f, "four noises: what one does to a quick ear");
+            Assert.AreNotEqual(RobotState.Alerted, slow.State);
+            for (int i = 0; i < 12; i++) slow.OnNoise(spot, 0.3f, m_Player, m_Now);
+            Assert.AreEqual(RobotState.Alerted, slow.State, "sixteen: sure (four times the quick ear's four)");
+        }
+
+        [Test]
         public void EnoughNoiseDetectsTheSourceWithAWarning()
         {
             for (int i = 0; i < 4; i++) m_Brain.OnNoise(new Vector3(0, 0, 3), 0.3f, m_Player, m_Now);

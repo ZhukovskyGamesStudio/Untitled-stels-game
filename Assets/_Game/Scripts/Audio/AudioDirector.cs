@@ -311,7 +311,8 @@ namespace Stealth.Audio
                     case AirEvent.Jump: Sfx.At(Bank.Jump, pos, volume * 0.8f, Sfx.Group.Footsteps); break;
                     case AirEvent.Land:
                         Sfx.At(Bank.Land, pos, volume, Sfx.Group.Footsteps);
-                        Sfx.At(SoundBank.Any(Bank.Steps(StepSurfaces.At(pos))), pos, volume * 0.8f, Sfx.Group.Footsteps, 0.86f); // on what they came down
+                        var landedOn = StepSurfaces.At(pos);
+                        Sfx.At(SoundBank.Any(Bank.Steps(landedOn)), pos, volume * 0.8f * AudioRules.SurfaceVolume(landedOn, m_Mix), Sfx.Group.Footsteps, 0.86f); // on what they came down
                         w.NextStep = Time.time + 0.25f;
                         break;
                 }
@@ -321,7 +322,8 @@ namespace Stealth.Audio
                 if (float.IsInfinity(interval)) { w.NextStep = Mathf.Max(w.NextStep, Time.time + 0.12f); continue; }
                 if (Time.time < w.NextStep) continue;
                 w.NextStep = Time.time + interval;
-                Sfx.At(SoundBank.Any(Bank.Steps(StepSurfaces.At(pos))), pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix), Sfx.Group.Footsteps, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
+                var surface = StepSurfaces.At(pos);
+                Sfx.At(SoundBank.Any(Bank.Steps(surface)), pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix) * AudioRules.SurfaceVolume(surface, m_Mix), Sfx.Group.Footsteps, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
             }
             Prune(m_Players, PlayerController.All);
         }

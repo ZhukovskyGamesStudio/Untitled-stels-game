@@ -50,6 +50,9 @@ namespace Stealth.Audio
         public static float StepVolume(float speed, bool crouching, AudioMix mix) =>
             crouching ? mix.CrouchStep : speed >= mix.RunSpeed ? mix.RunStep : mix.WalkStep;
 
+        /// <summary>A step's loudness for what it lands on: the squelch of the wet sewer floor is quieter (<see cref="AudioMix.WetStep"/>).</summary>
+        public static float SurfaceVolume(StepSurface surface, AudioMix mix) => surface == StepSurface.Wet ? mix.WetStep : 1f;
+
         /// <summary>0 calm, 1 suspicious / investigating, 2 chasing / alarmed.</summary>
         public static int AlertLevel(float awareness, bool investigating, bool chasing) =>
             chasing || awareness >= 0.999f ? 2 : investigating || awareness >= 0.35f ? 1 : 0;

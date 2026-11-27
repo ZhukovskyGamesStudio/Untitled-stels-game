@@ -46,6 +46,8 @@ namespace Stealth.Configs
         public float StepLength = 1.25f;
         [Tooltip("Relative loudness of a crouched / walking / running step.")]
         public float CrouchStep = 0.3f, WalkStep = 0.65f, RunStep = 1f;
+        [Tooltip("Steps in water and on the wet sewer floor (the squelch, StepSurface.Wet): this share of any other step's loudness.")]
+        public float WetStep = 0.5f;
         [Tooltip("Speed (m/s) above which steps count as running.")]
         public float RunSpeed = 5f;
 
@@ -101,9 +103,9 @@ namespace Stealth.Configs
         [Header("In the world")]
         public float Volume = 1f;
         [Tooltip("About full volume closer than this (m); the fade bends in smoothly around it.")]
-        public float MinDistance = 1.5f;
+        public float MinDistance = 3f;
         [Tooltip("Silent further than this (m).")]
-        public float MaxDistance = 60f;
+        public float MaxDistance = 120f;
         [Tooltip("How fast a voice gets quieter with distance: far away gain ≈ (MinDistance / distance) ^ this (1 = inverse distance, real life; lower = carries further).")]
         public float Rolloff = 0.55f;
         [Tooltip("Share of MaxDistance from which the voice eases out to silence (a smooth S, no edge).")]
