@@ -20,6 +20,26 @@ namespace Stealth.Game
         /// <summary>The car's upgrades this run.</summary>
         public CarUpgrades Upgrades { get; } = new();
 
+        /// <summary>
+        /// The trunk's shelves in the car's bed, one per level (<see cref="CarShelves"/>): what lies on each — the team's, for
+        /// the whole run, like the bench's. A shelf takes things once its level is bought.
+        /// </summary>
+        public TeamStash[] Shelves { get; } =
+        {
+            new(CarShelves.Columns, CarShelves.Rows), new(CarShelves.Columns, CarShelves.Rows), new(CarShelves.Columns, CarShelves.Rows),
+        };
+
+        /// <summary>The shelf of this number, or null (no such shelf).</summary>
+        public TeamStash Shelf(int shelf) => shelf >= 0 && shelf < Shelves.Length ? Shelves[shelf] : null;
+
+        /// <summary>Whether a player at <paramref name="position"/> can reach the car's shelf <paramref name="shelf"/> (and it is fitted).</summary>
+        public bool AtShelf(Vector3 position, int shelf)
+        {
+            if (!CarShelves.Fitted(shelf, Upgrades.Level(CarUpgrade.Trunk))) return false;
+            var at = Vehicles.Car.Active != null ? Vehicles.Car.Active.Shelf(shelf) : null;
+            return at != null && ServerReach.WithinFlat(position, at.Point, at.Reach + 0.6f) && Mathf.Abs(position.y - at.Point.y) < 2.4f;
+        }
+
         static CarUpgradeSettings UpgradeSettings => Tuning.Run.Upgrades;
 
         /// <summary>This run's upgrade recipes (every peer makes the same from the run's seed).</summary>
@@ -78,6 +98,7 @@ namespace Stealth.Game
         void ClearUpgradesServer()
         {
             Upgrades.Clear();
+            foreach (var shelf in Shelves) shelf.Clear(); // (the shelves went with the trunk)
             FitStash();
             FillTeleport();
             ClearRadioServer();

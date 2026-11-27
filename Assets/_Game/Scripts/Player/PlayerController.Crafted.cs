@@ -36,20 +36,27 @@ namespace Stealth.Player
         /// or Tab again, the menu, a fall, or walking away from the car.
         /// </summary>
         public bool AtBench { get; private set; }
+        /// <summary>
+        /// Owner: a shelf of the car's bed is open (E at it; its number, −1 none): the backpack open as with Tab, the shelf's
+        /// grid beside it. Closes like the bench.
+        /// </summary>
+        public int AtShelf { get; private set; } = -1;
         bool m_BenchOpenedNow;
 
-        /// <summary>Owner, every frame: the bench closes when it should.</summary>
+        /// <summary>Owner, every frame: the bench (or a shelf) closes when it should.</summary>
         void UpdateBench(bool menu)
         {
-            if (!AtBench) { m_BenchOpenedNow = false; return; }
+            if (!AtBench && AtShelf < 0) { m_BenchOpenedNow = false; return; }
             var gm = GameManager.Instance;
-            bool shut = menu || Downed || gm == null || !gm.AtBench(transform.position) || SeatIndex >= 0 || UsingTerminal != null;
+            bool inReach = gm != null && (AtBench ? gm.AtBench(transform.position) : gm.AtShelf(transform.position, AtShelf));
+            bool shut = menu || Downed || !inReach || SeatIndex >= 0 || UsingTerminal != null;
             // (the press that opened it is not the press that shuts it)
             bool pressed = Controls.Pressed(GameAction.Interact);
             if (m_BenchOpenedNow && (pressed || Controls.Pressed(GameAction.Hands))) shut = true;
             m_BenchOpenedNow = true;
             if (!shut) return;
             AtBench = false;
+            AtShelf = -1;
             m_BenchOpenedNow = false;
             if (pressed) m_UseWaitRelease = true; // (the press that shut it does not open it again)
         }

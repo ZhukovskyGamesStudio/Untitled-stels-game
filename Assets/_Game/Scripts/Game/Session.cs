@@ -186,6 +186,10 @@ namespace Stealth.Game
         void RequestBench(int index, byte x, byte y, byte rot);
         void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot);
         void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot);
+        // A shelf in the car's bed (its number: Vehicles.CarShelf.Number), the same way.
+        void RequestShelf(byte shelf, int index, byte x, byte y, byte rot);
+        void RequestUnshelf(byte shelf, InventoryEntry from, byte x, byte y, byte rot);
+        void RequestShelfMove(byte shelf, InventoryEntry from, byte x, byte y, byte rot);
         /// <summary>«Combine»: what lies on the bench becomes its recipe's result (or may break).</summary>
         void RequestCombine();
         /// <summary>Raise a car upgrade one level at the garage's upgrade bench (Vehicles.CarUpgrade).</summary>

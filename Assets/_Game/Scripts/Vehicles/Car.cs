@@ -90,6 +90,19 @@ namespace Stealth.Vehicles
         /// <summary>The workbench in the bed (the team's bench: <see cref="Game.GameManager.Bench"/>).</summary>
         public CarWorkbench Bench => m_Bench != null ? m_Bench : m_Bench = GetComponentInChildren<CarWorkbench>();
         CarWorkbench m_Bench;
+
+        /// <summary>
+        /// The trunk's shelf of this number (<see cref="CarShelf.Number"/>), whether it is fitted or not (an unbought one is a
+        /// hidden part of the bed); null if the car has none.
+        /// </summary>
+        public CarShelf Shelf(int number)
+        {
+            m_Shelves ??= GetComponentsInChildren<CarShelf>(true);
+            foreach (var s in m_Shelves)
+                if (s != null && s.Number == number) return s;
+            return null;
+        }
+        CarShelf[] m_Shelves;
         static readonly RaycastHit[] s_Hits = new RaycastHit[16];
         static readonly Collider[] s_Overlaps = new Collider[16];
 

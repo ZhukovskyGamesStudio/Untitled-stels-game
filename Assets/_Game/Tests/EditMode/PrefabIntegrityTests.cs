@@ -235,5 +235,38 @@ namespace Stealth.Tests
             }
             Assert.Greater(robots, 20, "every robot and device was looked at");
         }
+
+        /// <summary>
+        /// The car's three shelves (the trunk upgrade): each a shelf of its own number with its grid's corner on its board's
+        /// top — the grid runs along the board and lies within it, clear of its ends — and a piece for every cell.
+        /// </summary>
+        [Test]
+        public void TheCarsShelvesLieOnTheirBoards()
+        {
+            var car = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Vehicles/Car.prefab");
+            Assert.IsNotNull(car);
+            var shelves = car.GetComponentsInChildren<Stealth.Vehicles.CarShelf>(true).OrderBy(s => s.Number).ToArray();
+            Assert.AreEqual(Stealth.Vehicles.CarShelves.Count, shelves.Length, "a shelf per trunk level");
+            var grid = Stealth.Vehicles.CarShelves.GridSize;
+            for (int i = 0; i < shelves.Length; i++)
+            {
+                var shelf = shelves[i];
+                Assert.AreEqual(i, shelf.Number);
+                Assert.IsNotNull(shelf.Board, $"shelf {i}: its board");
+                Assert.AreEqual(Stealth.Vehicles.CarShelves.Columns * Stealth.Vehicles.CarShelves.Rows, shelf.Pieces.Length, $"shelf {i}: a piece per cell");
+                var board = shelf.GetComponentsInChildren<MeshFilter>(true).First(f => f.name.Contains($"Shelf{i + 1}_Board"));
+                var b = board.sharedMesh.bounds;
+                // the grid's far corners in the board mesh's own space: on its top, within its length and depth
+                foreach (var corner in new[] { Vector3.zero, new Vector3(grid.x, 0f, 0f), new Vector3(0f, 0f, -grid.y), new Vector3(grid.x, 0f, -grid.y) })
+                {
+                    var p = board.transform.InverseTransformPoint(shelf.Board.TransformPoint(corner));
+                    var lo = b.min - Vector3.one * 0.01f;
+                    var hi = b.max + Vector3.one * 0.01f;
+                    Assert.IsTrue(p.x >= lo.x && p.x <= hi.x && p.y >= lo.y && p.y <= hi.y && p.z >= lo.z && p.z <= hi.z,
+                        $"shelf {i}: the grid's corner {corner} lies off its board ({p} not in {b})");
+                }
+                Assert.AreEqual(0f, Vector3.Dot(shelf.Board.up, Vector3.up) - 1f, 1e-3f, $"shelf {i}: the grid lies flat");
+            }
+        }
     }
 }

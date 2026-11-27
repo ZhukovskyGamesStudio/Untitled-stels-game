@@ -551,6 +551,49 @@ namespace Stealth.EditorTools
         /// The workbench at the cab's end of the bed (Tools/Blender/car_bench.py, modelled in the car's frame): its model on
         /// the car's body (it sways with it), the place E opens it (<see cref="CarWorkbench"/>) at its top.
         /// </summary>
+        /// <summary>
+        /// A shelf of the trunk upgrade (Vehicles.CarShelf on its level's holder): E opens its grid, its things lie on its
+        /// board — the grid's corner on the board's top (read off the board's mesh: its length along the bed, its middle across
+        /// clear of the lip on its inner edge), a piece per cell under it.
+        /// </summary>
+        static void BuildCarShelf(GameObject holder, int number, Transform body)
+        {
+            var board = holder.GetComponentsInChildren<MeshFilter>(true).FirstOrDefault(f => f.name.Contains($"Shelf{number + 1}_Board"));
+            if (board == null || board.sharedMesh == null) { Debug.LogWarning($"[Builder] car shelf {number + 1}: no board"); return; }
+            // the board's box in the body's space (its holder is hidden: no renderer bounds)
+            var mb = board.sharedMesh.bounds;
+            Vector3 lo = Vector3.positiveInfinity, hi = Vector3.negativeInfinity;
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                var p = body.InverseTransformPoint(board.transform.TransformPoint(corner));
+                lo = Vector3.Min(lo, p);
+                hi = Vector3.Max(hi, p);
+            }
+            bool alongZ = hi.z - lo.z >= hi.x - lo.x;
+            // across: toward the bed's wall (away from the middle), where the lip is not
+            var across = alongZ ? new Vector3(Mathf.Sign((lo.x + hi.x) * 0.5f), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign((lo.z + hi.z) * 0.5f));
+            var top = new Vector3((lo.x + hi.x) * 0.5f, lo.y + 0.025f, (lo.z + hi.z) * 0.5f) + across * 0.009f; // (board 25 mm thick; the lip 18 mm)
+            var turn = Quaternion.LookRotation(across, Vector3.up); // +Z across to the wall, +X along the board
+            var grid = Stealth.Vehicles.CarShelves.GridSize;
+            var corner0 = top - turn * Vector3.right * (grid.x / 2f) + turn * Vector3.forward * (grid.y / 2f); // rows run −Z from here
+            var bed = Child(holder.transform, "ShelfBoard").transform;
+            bed.SetPositionAndRotation(body.TransformPoint(corner0), body.rotation * turn);
+            var pieces = new System.Collections.Generic.List<MeshFilter>();
+            for (int i = 0; i < Stealth.Vehicles.CarShelves.Columns * Stealth.Vehicles.CarShelves.Rows; i++)
+            {
+                var piece = new GameObject($"Piece{i}");
+                piece.transform.SetParent(bed, false);
+                pieces.Add(piece.AddComponent<MeshFilter>());
+                piece.AddComponent<MeshRenderer>().enabled = false;
+            }
+            var shelf = holder.AddComponent<Stealth.Vehicles.CarShelf>();
+            shelf.Number = number;
+            shelf.Board = bed;
+            shelf.Pieces = pieces.ToArray();
+            shelf.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+        }
+
         static void BuildCarBench(Transform root, Transform body)
         {
             if (AssetDatabase.FindAssets("car_workbench t:Model", new[] { ModelsDir }).Length > 0)
@@ -628,6 +671,7 @@ namespace Stealth.EditorTools
             {
                 shelves.name = "Shelves";
                 look.Shelves = Levels(shelves, "Shelf");
+                for (int k = 0; k < look.Shelves.Length; k++) BuildCarShelf(look.Shelves[k], k, body);
             }
             var shredder = Part("car_shredder", body);
             if (shredder != null)

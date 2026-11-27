@@ -1036,6 +1036,7 @@ namespace Stealth.EditorTools
             ui.HandLabel = Ink(R(ui.HandSlot, "Label", BottomCenter, BottomCenter, new Vector2(0, 1), new Vector2(2 * c + 14, 22)), "", 18, TextAnchor.MiddleCenter, Face.Hand, UiPalette.Pen);
 
             BuildBenchPanel(e, root.transform, ui);
+            BuildShelfPanel(root.transform, ui);
 
             ui.Ghost = R(root.transform, "DragGhost", BottomLeft, TopLeft, Vector2.zero, Vector2.zero);
             ui.BlockPrefab = e.InventoryBlock;
@@ -1058,6 +1059,37 @@ namespace Stealth.EditorTools
         /// 4 x 4 grid on graph paper on the left, «combine» right of it a little under the middle with what comes of it
         /// over the button (a picture and a name, or «result unknown»), and an (i) in the corner whose rules show on hover.
         /// </summary>
+        /// <summary>A shelf of the car's bed: just its grid (a title with its number over it), where the bench's panel is.</summary>
+        static void BuildShelfPanel(Transform root, InventoryUI ui)
+        {
+            const float c = InventoryUI.Cell, pad = 14f, title = 30f;
+            int cols = Stealth.Vehicles.CarShelves.Columns, rows = Stealth.Vehicles.CarShelves.Rows;
+            float gw = cols * c, gh = rows * c;
+            float w = pad + gw + pad, h = title + pad + gh + pad;
+            var panel = R(root, "Shelf", BottomCenter, BottomCenter, new Vector2(0, 222), new Vector2(w, h));
+            Card(Stretch(panel, "Background"));
+            ui.ShelfTitle = Ink(R(panel, "Title", TopLeft, TopLeft, new Vector2(pad, -4), new Vector2(gw, 24)), "", 16, TextAnchor.LowerLeft, Face.Caps);
+            RuleLine(panel, TopLeft, TopLeft, new Vector2(pad, -title), w - 2 * pad, UiPalette.Ink, 1.5f);
+            var grid = R(panel, "Grid", TopLeft, TopLeft, new Vector2(pad, -(title + pad)), new Vector2(gw, gh));
+            grid.pivot = TopLeft;
+            grid.anchoredPosition = new Vector2(pad, -(title + pad));
+            FormBox(R(grid, "Lining", Center, Center, Vector2.zero, new Vector2(gw + 6, gh + 6)), UiPalette.PaperShade);
+            var paper = Img(R(grid, "Graph", Center, Center, Vector2.zero, new Vector2(gw, gh)), UiPalette.Rule.A(0.7f), PaperSprite("graph"));
+            paper.type = Image.Type.Tiled;
+            var cells = new List<Image>();
+            for (int y = 0; y < rows; y++)
+                for (int x = 0; x < cols; x++)
+                    cells.Add(Img(R(grid, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), UiPalette.Ink.A(0.04f)));
+            ui.ShelfGrid = grid;
+            ui.ShelfCells = cells.ToArray();
+            ui.ShelfItems = Stretch(grid, "Items");
+            ui.ShelfItems.pivot = TopLeft;
+            ui.ShelfHighlights = Stretch(grid, "Highlights");
+            ui.ShelfHighlights.pivot = TopLeft;
+            ui.ShelfPanel = panel.gameObject;
+            panel.gameObject.SetActive(false);
+        }
+
         static void BuildBenchPanel(UiElements e, Transform root, InventoryUI ui)
         {
             const float c = InventoryUI.Cell, pad = 14f, title = 30f, side = 170f, gap = 14f;

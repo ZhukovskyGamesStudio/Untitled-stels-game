@@ -124,5 +124,29 @@ namespace Stealth.Tests
             Assert.AreEqual(5, stash.Columns);
             Assert.IsFalse(stash.CanPlace(ItemCatalog.Book, 0, 5, 4), "back to its own size");
         }
+
+        [Test]
+        public void EachTrunkLevelBringsAShelfOfItsOwn()
+        {
+            Assert.IsFalse(CarShelves.Fitted(0, 0), "no trunk: no shelves");
+            Assert.IsTrue(CarShelves.Fitted(0, 1));
+            Assert.IsFalse(CarShelves.Fitted(1, 1), "level 1: the low shelf only");
+            Assert.IsTrue(CarShelves.Fitted(2, 3));
+            Assert.IsFalse(CarShelves.Fitted(3, 3));
+            Assert.AreEqual(CarUpgrades.MaxLevelled, CarShelves.Count);
+            // the grid fits the board it lies on (1.36 x 0.27 m, the things in their own size)
+            Assert.LessOrEqual(CarShelves.GridSize.x, 1.36f);
+            Assert.LessOrEqual(CarShelves.GridSize.y, 0.27f - 0.018f, "clear of the lip");
+
+            var shelf = new Stealth.Game.TeamStash(CarShelves.Columns, CarShelves.Rows);
+            Assert.IsTrue(shelf.Add(ItemCatalog.Flashlight, 0, 0, 0, 1), "a flashlight lies along the board");
+            Assert.IsFalse(shelf.FindSpot(ItemCatalog.Book, out _, out _, out _), "a 2 x 2 book does not fit a one-cell-deep shelf");
+            foreach (var e in shelf.Items)
+            {
+                var (position, _, _) = CarShelves.Place(e);
+                Assert.That(position.x, Is.InRange(0f, CarShelves.GridSize.x), "on the board along");
+                Assert.That(-position.z, Is.InRange(0f, CarShelves.GridSize.y), "on the board across");
+            }
+        }
     }
 }

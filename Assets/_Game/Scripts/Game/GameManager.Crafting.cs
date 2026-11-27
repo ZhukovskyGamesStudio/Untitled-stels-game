@@ -263,7 +263,7 @@ namespace Stealth.Game
             return total;
         }
 
-        /// <summary>How many chess detectors the team has: on the players, in the car's bed, on the bench and in the stash.</summary>
+        /// <summary>How many chess detectors the team has: on the players, in the car's bed, on the bench, its shelves and in the stash.</summary>
         int ChessDetectors()
         {
             int n = 0;
@@ -271,6 +271,7 @@ namespace Stealth.Game
                 if (p.TryGetComponent<PlayerInventory>(out var inv)) n += inv.Items.Count(e => e.Shape == ItemCatalog.ChessDetector);
             n += Cargo.Items.Count(e => e.Shape == ItemCatalog.ChessDetector);
             n += Bench.Items.Count(e => e.Shape == ItemCatalog.ChessDetector);
+            foreach (var shelf in Shelves) n += shelf.Items.Count(e => e.Shape == ItemCatalog.ChessDetector);
             n += Stash.Items.Count(e => e.Shape == ItemCatalog.ChessDetector);
             return n;
         }

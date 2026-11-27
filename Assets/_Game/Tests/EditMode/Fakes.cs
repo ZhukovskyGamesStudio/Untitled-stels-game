@@ -148,6 +148,9 @@ namespace Stealth.Tests
         public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unbench {from.X},{from.Y} {x},{y},{rot}");
         public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"bench-move {from.X},{from.Y} {x},{y},{rot}");
         public void RequestCombine() => Requests.Add("combine");
+        public void RequestShelf(byte shelf, int index, byte x, byte y, byte rot) => Requests.Add($"shelf {shelf} {index} {x},{y},{rot}");
+        public void RequestUnshelf(byte shelf, InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unshelf {shelf} {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestShelfMove(byte shelf, InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"shelf-move {shelf} {from.X},{from.Y} {x},{y},{rot}");
         public void RequestCarUpgrade(byte upgrade) => Requests.Add($"upgrade {upgrade}");
     }
 

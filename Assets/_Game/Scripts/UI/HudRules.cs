@@ -249,6 +249,7 @@ namespace Stealth.UI
             Level.UseKind.MedTable => ReticleIcon.Heal,
             Level.UseKind.Workbench => ReticleIcon.Craft,
             Level.UseKind.CarBench => ReticleIcon.Craft,
+            Level.UseKind.CarShelf => ReticleIcon.Crate, // (a place to keep things, like a crate)
             Level.UseKind.KeyDoor => ReticleIcon.Key,
             Level.UseKind.GateLever => ReticleIcon.Lever,
             Level.UseKind.CarSeat => ReticleIcon.Seat,

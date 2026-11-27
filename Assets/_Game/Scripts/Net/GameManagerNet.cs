@@ -61,6 +61,10 @@ namespace Stealth.Net
         /// <summary>The car's workbench: the recipes made this run (bits) and the last press of «combine».</summary>
         readonly NetworkVariable<int> m_Known = new(), m_LastCombine = new();
         int m_PushedBench = -1;
+        /// <summary>The trunk's shelves (GameManager.Shelves), one list each (fields of their own: NGO finds no list in an array).</summary>
+        NetworkList<NetInventoryEntry> m_Shelf0, m_Shelf1, m_Shelf2;
+        NetworkList<NetInventoryEntry>[] m_Shelves;
+        readonly int[] m_PushedShelves = { -1, -1, -1 };
         NetworkList<ulong> m_Cargo, m_Shred;
         readonly NetworkVariable<double> m_ShredStart = new();
         int m_PushedShred = -1;
@@ -88,6 +92,10 @@ namespace Stealth.Net
             m_Stash = new NetworkList<NetInventoryEntry>();
             m_ExitStash = new NetworkList<NetInventoryEntry>();
             m_Bench = new NetworkList<NetInventoryEntry>();
+            m_Shelf0 = new NetworkList<NetInventoryEntry>();
+            m_Shelf1 = new NetworkList<NetInventoryEntry>();
+            m_Shelf2 = new NetworkList<NetInventoryEntry>();
+            m_Shelves = new[] { m_Shelf0, m_Shelf1, m_Shelf2 };
             m_Cargo = new NetworkList<ulong>();
             m_Shred = new NetworkList<ulong>();
             m_Explored = new NetworkList<ulong>();
@@ -119,6 +127,7 @@ namespace Stealth.Net
             m_Stash.OnListChanged += _ => PullStash();
             m_ExitStash.OnListChanged += _ => PullStash();
             m_Bench.OnListChanged += _ => PullStash();
+            foreach (var shelf in m_Shelves) shelf.OnListChanged += _ => PullStash();
             m_Known.OnValueChanged += (_, _) => m_Game.ApplyCrafting(m_Known.Value, m_LastCombine.Value);
             m_LastCombine.OnValueChanged += (_, _) => m_Game.ApplyCrafting(m_Known.Value, m_LastCombine.Value);
             m_Game.ApplyCrafting(m_Known.Value, m_LastCombine.Value);
@@ -183,6 +192,8 @@ namespace Stealth.Net
             NetSync.SetList(m_Stash, ref m_PushedStash, m_Game.Stash.Version, m_Game.Stash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_ExitStash, ref m_PushedExitStash, m_Game.ExitStash.Version, m_Game.ExitStash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_Bench, ref m_PushedBench, m_Game.Bench.Version, m_Game.Bench.Items, NetInventoryEntry.From);
+            for (int i = 0; i < m_Shelves.Length; i++)
+                NetSync.SetList(m_Shelves[i], ref m_PushedShelves[i], m_Game.Shelves[i].Version, m_Game.Shelves[i].Items, NetInventoryEntry.From);
             NetSync.Set(m_Known, m_Game.KnownRecipes);
             NetSync.Set(m_LastCombine, m_Game.LastCombine);
             NetSync.SetList(m_Cargo, ref m_PushedCargo, m_Game.Cargo.Version, m_Game.Cargo.Items, c => c.Pack());
@@ -254,6 +265,13 @@ namespace Stealth.Net
             m_Buffer.Clear();
             foreach (var e in m_Bench) m_Buffer.Add(e.ToEntry());
             m_Game.Bench.ApplyReplicated(m_Buffer);
+            for (int i = 0; i < m_Shelves.Length; i++)
+            {
+                if (m_Shelves[i] == null) continue;
+                m_Buffer.Clear();
+                foreach (var e in m_Shelves[i]) m_Buffer.Add(e.ToEntry());
+                m_Game.Shelves[i].ApplyReplicated(m_Buffer);
+            }
         }
 
         readonly List<ulong> m_CargoBuffer = new();

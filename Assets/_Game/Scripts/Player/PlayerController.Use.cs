@@ -151,7 +151,8 @@ namespace Stealth.Player
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
-            if (UseTarget.Kind == UseKind.CarBench) { AtBench = true; return; }      // the bench opens here; its moves are asked of the server
+            if (UseTarget.Kind == UseKind.CarBench) { AtBench = true; AtShelf = -1; return; }      // the bench opens here; its moves are asked of the server
+            if (UseTarget.Kind == UseKind.CarShelf) { AtShelf = UseTarget.Index; AtBench = false; return; } // a shelf's grid, the same way
             if (UseTarget.Kind == UseKind.Workbench) { OpenUpgrades(); return; }   // the car upgrade bench: its screen here, the upgrades asked of the server
             Link.SendUse(UseTarget.Kind, UseTarget.Index);
         }

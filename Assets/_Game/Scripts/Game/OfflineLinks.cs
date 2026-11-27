@@ -68,6 +68,9 @@ namespace Stealth.Game
         public void RequestBench(int index, byte x, byte y, byte rot) => m_I.BenchServer(index, x, y, rot);
         public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => m_I.UnbenchServer(from, x, y, rot);
         public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => m_I.BenchMoveServer(from, x, y, rot);
+        public void RequestShelf(byte shelf, int index, byte x, byte y, byte rot) => m_I.ShelfServer(shelf, index, x, y, rot);
+        public void RequestUnshelf(byte shelf, InventoryEntry from, byte x, byte y, byte rot) => m_I.UnshelfServer(shelf, from, x, y, rot);
+        public void RequestShelfMove(byte shelf, InventoryEntry from, byte x, byte y, byte rot) => m_I.ShelfMoveServer(shelf, from, x, y, rot);
         public void RequestCombine() => m_I.CombineServer();
         public void RequestCarUpgrade(byte upgrade) => m_I.CarUpgradeServer(upgrade);
     }

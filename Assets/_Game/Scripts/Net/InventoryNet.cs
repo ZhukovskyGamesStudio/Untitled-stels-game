@@ -79,7 +79,19 @@ namespace Stealth.Net
         public void RequestBench(int index, byte x, byte y, byte rot) => BenchRpc(index, x, y, rot);
         public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => UnbenchRpc(NetInventoryEntry.From(from), x, y, rot);
         public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => BenchMoveRpc(NetInventoryEntry.From(from), x, y, rot);
+        public void RequestShelf(byte shelf, int index, byte x, byte y, byte rot) => ShelfRpc(shelf, index, x, y, rot);
+        public void RequestUnshelf(byte shelf, InventoryEntry from, byte x, byte y, byte rot) => UnshelfRpc(shelf, NetInventoryEntry.From(from), x, y, rot);
+        public void RequestShelfMove(byte shelf, InventoryEntry from, byte x, byte y, byte rot) => ShelfMoveRpc(shelf, NetInventoryEntry.From(from), x, y, rot);
         public void RequestCombine() => CombineRpc();
+
+        [Rpc(SendTo.Server)]
+        void ShelfRpc(byte shelf, int index, byte x, byte y, byte rot) => m_Inventory.ShelfServer(shelf, index, x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void UnshelfRpc(byte shelf, NetInventoryEntry from, byte x, byte y, byte rot) => m_Inventory.UnshelfServer(shelf, from.ToEntry(), x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void ShelfMoveRpc(byte shelf, NetInventoryEntry from, byte x, byte y, byte rot) => m_Inventory.ShelfMoveServer(shelf, from.ToEntry(), x, y, rot);
         public void RequestCarUpgrade(byte upgrade) => CarUpgradeRpc(upgrade);
 
         [Rpc(SendTo.Server)]
