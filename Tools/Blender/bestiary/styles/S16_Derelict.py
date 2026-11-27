@@ -341,14 +341,27 @@ def worker(L):
         for sx in (-1, 1):
             P.add("Accent", L.box((.03, .16, .4), (sx * .215, .22, .78), r=.006))                           # service panels
         P.add("Accent", L.box((.5, .34, .05), (0, .22, 1.3)))                                              # cap
-        for k in range(10):                                                                                # cable chain
+        for k in range(7):                                                                                 # cable chain
             P.add("Accent", [s.rbox((.1, .035, .055), (0, .075, .38 + k * .068), r=.005, seg=1)])
 
     def beacon(L, P):
         P.add("Accent", L.cyl(.07, .035, (0, .25, 1.335)))
         P.add("Eye", L.cyl(.05, .07, (0, .25, 1.38), radius2=.04))
 
-    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
+    def bezel(w, h, d):
+        """The display's thick rounded CRT bezel: four bars standing proud of the screen plate, a hood behind it."""
+        t, k = .03, d + .014
+        out = [s.rbox((w + 2 * t, k, t), (0, -k / 2 + .004, sz * (h + t) / 2), r=.01, seg=1) for sz in (-1, 1)]
+        out += [s.rbox((t, k, h), (sx * (w + t) / 2, -k / 2 + .004, 0), r=.01, seg=1) for sx in (-1, 1)]
+        out.append(s.rbox((w * .9, .05, h * .86), (0, .022, 0), r=.015, seg=1, taper=(.8, .8)))
+        return out
+
+    def display(L, P):
+        """The warehouse display on the mast's front (the design note: the worker reads as the loot hauler): a small
+        CRT-style screen tipped back towards the camera, the box-on-a-pallet pictogram glowing on it."""
+        D.worker_plaque(L, P, loc=(0, .07, 1.02), w=.22, h=.19, tilt=22, frame=bezel)
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon, extra=display)
 
 
 def turret(L):
@@ -543,11 +556,695 @@ def attach_mic(L):
     return P
 
 
+# =========================================================================== the danger-zone robots
+# The facility's own service and security machines from the same 1980s research-complex catalogue as the furniture:
+# moulded enamel shells (beige-grey) with panel seams and service hatches, louvred vent grilles, ring joints, bent
+# steel tube, deep lens housings. Concepts: Logs/comfy/danger_s16/<name>_*.png.
+
+def _ring(center, radius, r, axis="Y", n=12):
+    """A closed tube ring (a key bow, a shackle, a hoop) round `axis` through center."""
+    c = V(center)
+    pts = []
+    for k in range(n + 1):
+        a = k / n * math.tau
+        u, v = math.cos(a) * radius, math.sin(a) * radius
+        pts.append(c + {"X": V((0, u, v)), "Y": V((u, 0, v)), "Z": V((u, v, 0))}[axis])
+    return s.tube([tuple(p) for p in pts], r, res=1, smooth=False)
+
+
+def _poly_arc(center, radius, a0, a1, r, plane, n):
+    """An open ring segment as straight runs (cheaper than the style's smooth arc)."""
+    c = V(center)
+    pts = []
+    for k in range(n + 1):
+        a = math.radians(a0 + (a1 - a0) * k / n)
+        u, v = math.cos(a) * radius, math.sin(a) * radius
+        pts.append(tuple(c + {"XY": V((u, v, 0)), "XZ": V((u, 0, v)), "YZ": V((0, u, v))}[plane]))
+    return s.tube(pts, r, res=1, smooth=False)
+
+
+def _small_wheels(P, centres, radius, width):
+    """Small casters and wheels (r <= 0.1): a rounded tyre and a hub cap at a lower segment count than the style's
+    wheel — they are a few pixels on screen. Symmetric about the centre (they spin about it)."""
+    for i, c in enumerate(centres):
+        P.add(f"AccentWheel{i}", [s.rcyl(radius, width, c, axis="X", seg=12, r=min(.012, width * .25), bevel_seg=1),
+                                  s.rcyl(radius * .45, width * 1.12, c, axis="X", seg=8, r=.004, bevel_seg=1)])
+
+
+def _bent(points, r, bend=0.06, n=3):
+    """The style's bent tube at a lower count (six sides, three steps a corner) for frames on small robots."""
+    P_ = [V(p) for p in points]
+    out = [P_[0]]
+    for i in range(1, len(P_) - 1):
+        a, p, b = P_[i - 1], P_[i], P_[i + 1]
+        d1, d2 = a - p, b - p
+        k = min(bend, d1.length * 0.45, d2.length * 0.45)
+        q0, q1 = p + d1.normalized() * k, p + d2.normalized() * k
+        for j in range(n + 1):
+            u = j / n
+            out.append(q0 * (1 - u) ** 2 + p * 2 * u * (1 - u) + q1 * u * u)
+    out.append(P_[-1])
+    return s.tube([tuple(o) for o in out], r, res=1, smooth=False)
+
+
+def _key(top, length=.13, k=1.0):
+    """A big service key hanging down from `top` (its bow): a flat bow ring, a round shank, two bit teeth."""
+    x, y, z = top
+    out = [_ring((x, y, z - .022 * k), .02 * k, .007 * k, axis="Y", n=10)]
+    out.append(s.rcyl(.007 * k, length, (x, y, z - .04 * k - length / 2), seg=8, r=.002, bevel_seg=1))
+    for d, h in ((.0, .022), (.026, .016)):
+        out.append(s.rbox((.022 * k, .01 * k, h * k), (x + .014 * k, y, z - .04 * k - length + .012 + d), r=.002, seg=1))
+    return out
+
+
+def _padlock(top, w=.13):
+    """A heavy padlock hanging from `top`: a round shackle into a thick rounded body with a keyhole plate."""
+    x, y, z = top
+    h = w * .9
+    out = [s.tube([(x - w * .3, y, z - w * .42), (x - w * .3, y, z - w * .12), (x - w * .22, y, z - w * .02), (x, y, z + w * .03),
+                   (x + w * .22, y, z - w * .02), (x + w * .3, y, z - w * .12), (x + w * .3, y, z - w * .42)], w * .07, res=1, segments_per=3)]
+    out.append(s.rbox((w, w * .42, h), (x, y, z - w * .4 - h / 2), r=w * .14, seg=3))
+    out.append(s.rcyl(w * .16, .012, (x, y - w * .21, z - w * .4 - h * .55), axis="Y", seg=12, r=.003, bevel_seg=1))
+    return out
+
+
+def _grille(center, w, h, n=4, axis="-Y"):
+    """A louvred vent: a frame and n slats on a backing plate that sinks into the curved shell behind it."""
+    back = {"-Y": V((0, 1, 0)), "Y": V((0, -1, 0)), "X": V((-1, 0, 0)), "-X": V((1, 0, 0))}[axis]
+    size = (w - .01, .05, h - .01) if axis in ("-Y", "Y") else (.05, w - .01, h - .01)
+    rot = {"-Y": (0, 0, 0), "Y": (0, 0, math.pi), "X": (0, 0, math.pi / 2), "-X": (0, 0, -math.pi / 2)}[axis]
+    f, gap = .016, h / (n + 1)
+    parts = [s.rbox((w - f, .012, .014), (0, 0, -h / 2 + gap * (k + 1)), r=0, seg=1, rot=(math.radians(-25), 0, 0)) for k in range(n)]
+    parts += [s.rbox((f, .017, h), (x, 0, 0), r=.004, seg=1) for x in (-w / 2 + f / 2, w / 2 - f / 2)]
+    parts += [s.rbox((w - f, .015, f), (0, 0, z), r=.004, seg=1) for z in (-h / 2 + f / 2, h / 2 - f / 2)]
+    for q in parts:
+        s.place(q, V(center), rot)
+    return parts + [s.rbox(size, tuple(V(center) + back * .026), r=0, seg=1)]
+
+
+def warden(L):
+    """The door warden: a squat enamel drum on a four-wheel skirt with a belt and a louvred vent, a domed head on a
+    neck ring with one deep lens under the peak of its cap shell, two arms on ring joints — the left holds a heavy
+    padlock out in front, the right a bunch of keys on a ring at the hip. Concept: Logs/comfy/danger_s16/warden_*."""
+    P = D.Parts()
+    _small_wheels(P, D.WARDEN_WHEELS, *D.WARDEN_WHEEL)
+    for x, y, _ in D.WARDEN_WHEELS:
+        P.add("Accent", L.cyl(.03, .08, (x * .82, y, .085), axis="X"))                                       # axle stubs
+    P.add("Body", L.shell([(.1, .28, .24, 3.0), (.16, .3, .26, 3.2), (.2, .29, .25, 3.0)], caps=.02))           # skirt
+    P.add("Body", L.shell([(.18, .22, .19, 2.4), (.3, .26, .22, 2.6), (.62, .27, .23, 2.6), (.9, .25, .21, 2.6),
+                           (1.0, .2, .17, 2.4)], caps=.06))                                                     # drum
+    P.add("Accent", L.loft([(.5, .282, .242, 2.6), (.58, .282, .242, 2.6)]))                                    # belt
+    P.add("Accent", L.box((.1, .04, .1), (0, -.24, .54), r=.015))                                               # buckle
+    P.add("Accent", _grille((0, -.225, .8), .2, .12))                                                           # vent
+    P.add("Eye", L.box((.08, .02, .02), (0, -.236, .69), r=.005))                                               # status strip
+    P.add("Accent", L.cyl(.11, .07, (0, 0, 1.03)))                                                              # neck ring
+    P.add("Body", L.shell([(1.05, .17, .17, 2.2), (1.16, .2, .2, 2.4), (1.3, .19, .19, 2.3), (1.37, .14, .15, 2.0)], caps=.04))
+    P.add("Accent", L.shell([(1.32, .2, .2, 2.4, 0, .01), (1.4, .19, .19, 2.4, 0, .01), (1.47, .15, .15, 2.2, 0, .01)], caps=.03))  # cap
+    P.add("Accent", [s.place(s.ball(.18, seg=12, scale=(1, .95, .08)), (0, -.14, 1.335), rot=(math.radians(-10), 0, 0))])  # the peak
+    P.add("Eye", L.box((.06, .02, .03), (0, -.2, 1.42), r=.008))                                                # cap badge
+    acc, glow = L.eye(.048, (0, -.24, 1.2), depth=.07)
+    P.add("Accent", acc).add("Eye", glow)
+    for sx in (-1, 1):
+        P.add("Accent", L.cyl(.05, .04, (sx * .2, -.01, 1.21), axis="X"))                                       # ear pods
+    for sx in (-1, 1):
+        sh = V((sx * .29, 0, .86))
+        P.add("Accent", L.ball(.06, tuple(sh)))
+        if sx > 0:                                                                                               # the left arm: padlock out
+            el, wr = V((.33, -.06, .66)), V((.26, -.3, .7))
+        else:                                                                                                    # the right: keys at the hip
+            el, wr = V((-.35, -.02, .64)), V((-.34, -.08, .44))
+        P.add("Body", L.rod(tuple(sh), tuple(el), .05))
+        P.add("Accent", L.ball(.055, tuple(el)))
+        P.add("Body", L.rod(tuple(el), tuple(wr), .048))
+        P.add("Accent", L.box((.1, .1, .09), tuple(wr), r=.025))                                                # fist
+    P.add("Accent", _padlock((.26, -.33, .66), w=.19))
+    P.add("Accent", [_ring((-.34, -.08, .37), .045, .01, axis="X", n=12)])                                        # key ring
+    for k, (dy, dx) in enumerate(((-.04, 0), (0, .025), (.04, -.015))):
+        P.add("Accent", _key((-.34 + dx, -.08 + dy, .33), length=.12 + .025 * k, k=1.5))
+    return P
+
+
+def _wrench(p0, p1, w=.05):
+    """A big open-ended spanner from p0 (the grip) to p1 (the open jaw), its flat facing forward (-y)."""
+    a, b = V(p0), V(p1)
+    d = (b - a).normalized()
+    out = [align(s.rbox((w, w * .45, (b - a).length), r=.008, seg=1), a, b - d * w * .6)]
+    jaw = s.rbox((w * 2.4, w * .5, w * 2.0), b, r=.012, seg=2)
+    jaw = s.boolean(jaw, s.rbox((w * 1.1, w * 1.2, w * 1.6), b + d * w * .7, r=.004, seg=1))
+    out.append(jaw)
+    return out
+
+
+def repairman(L):
+    """The service crawler: a low rounded tool canister (an enamel shell over a grey base band, a louvred vent, a
+    carry handle on the lid) between four crab legs on ring joints, a camera block on a post at the front left and a
+    tool arm on the front right raising a big spanner. Concept: Logs/comfy/danger_s16/repairman_*."""
+    P = D.Parts()
+    P.add("Body", L.shell([(.16, .19, .15, 3.0), (.24, .22, .17, 3.2), (.42, .22, .17, 3.2), (.48, .19, .15, 3.0)], caps=.04))
+    P.add("Accent", L.loft([(.16, .2, .16, 3.0), (.26, .225, .175, 3.2)]))                                       # base band
+    P.add("Accent", _grille((.06, -.172, .36), .18, .1, n=3))
+    P.add("Accent", [bent([(-.1, .04, .47), (-.1, .04, .55), (.1, .04, .55), (.1, .04, .47)], .014, bend=.03)])  # handle
+    for i in range(4):
+        hip, knee, ankle, foot = D.repairman_leg(i)
+        P.add("Accent", L.ball(.05, tuple(hip.lerp(V((0, hip.y, hip.z)), .2))))                                  # hip socket
+        P.add(f"AccentLeg{i}Upper", L.ball(.05, tuple(hip)) + L.rod(tuple(hip), tuple(knee), .042, kind="piston")
+              + L.ball(.048, tuple(knee)))
+        P.add(f"AccentLeg{i}Lower", L.rod(tuple(knee), tuple(ankle), .038) + L.ball(.036, tuple(ankle))
+              + L.rod(tuple(ankle), tuple(foot + V((0, 0, .03))), .03)
+              + [s.rcyl(.05, .03, tuple(foot + V((0, 0, .015))), seg=12, r=.008, bevel_seg=1)])
+    # camera block on a post, front left
+    P.add("Accent", L.cyl(.018, .14, (-.15, -.13, .5)))
+    P.add("Body", L.box((.14, .1, .09), (-.15, -.15, .58), r=.025))
+    acc, glow = L.eye(.032, (-.15, -.22, .58), depth=.05)
+    P.add("Accent", acc).add("Eye", glow)
+    # the tool arm, front right
+    sh, el, wr = V((.16, -.1, .44)), V((.24, -.15, .62)), V((.2, -.17, .8))
+    P.add("Accent", L.ball(.045, tuple(sh)))
+    P.add("Body", L.rod(tuple(sh), tuple(el), .03) + L.rod(tuple(el), tuple(wr), .027))
+    P.add("Accent", L.ball(.038, tuple(el)) + L.box((.06, .06, .07), tuple(wr), r=.015))
+    P.add("Accent", _wrench(wr + V((0, 0, .02)), wr + V((.01, -.01, .3)), w=.06))
+    return P
+
+
+def _disc_grille(center, radius, axis="-Y", n=5, depth=.04):
+    """A round louvred outlet: a rolled rim, horizontal slats across it, a dark backing disc (all Accent)."""
+    c = V(center)
+    a = {"-Y": V((0, -1, 0)), "Y": V((0, 1, 0))}[axis]
+    out = [s.lathe([(radius * .8, 0), (radius, 0), (radius * 1.04, depth * .5), (radius, depth), (radius * .8, depth)], seg=20,
+                   axis=axis, loc=tuple(c - a * depth * .5))]
+    out.append(s.rcyl(radius * .82, depth * .8, tuple(c - a * depth * .1), axis="Y", seg=20, r=.004, bevel_seg=1))
+    for k in range(n):
+        z = -radius * .7 + radius * 1.4 * (k + .5) / n
+        w = 2 * math.sqrt(max(0.0, (radius * .82) ** 2 - z * z))
+        out.append(s.rbox((w, .012, radius * .16), tuple(c + a * depth * .35 + V((0, 0, z))), r=.003, seg=1,
+                          rot=(math.radians(-25), 0, 0)))
+    return out
+
+
+def smoker(L):
+    """The fog cart: a lying enamel pressure tank in two cradle straps on a bent-tube chassis with four wheels, a
+    round louvred outlet on its nose, three flared stacks and a gauge on top, a compressor box with a vent on the back
+    and hoses from it to the stacks. It has no eyes: it senses nothing. Concept: Logs/comfy/danger_s16/smoker_*."""
+    P = D.Parts()
+    _small_wheels(P, D.SMOKER_WHEELS, *D.SMOKER_WHEEL)
+    for sx in (-1, 1):
+        x = sx * .19
+        P.add("Accent", [_bent([(x, -.3, .26), (x, -.2, .14), (x, .2, .14), (x, .3, .26)], .022, bend=.05)])   # chassis tubes
+        for y in (-.2, .2):
+            P.add("Accent", L.cyl(.026, .1, (sx * .225, y, .1), axis="X"))                                    # axle stubs
+            P.add("Body", L.box((.06, .08, .12), (x, y, .12), r=.015))                                        # axle boxes
+    for y in (-.2, .2):
+        P.add("Accent", [s.tube([(-.19, y, .14), (.19, y, .14)], .02, res=2, smooth=False)])
+        P.add("Accent", [_poly_arc((0, y, .5), .275, 200, 340, .022, "XZ", 8)])                          # cradle straps
+        for sx in (-1, 1):
+            P.add("Accent", L.rod((sx * .19, y, .14), (sx * .2, y, .33), .02))
+    P.add("Body", L.shell([(0, .2, .2, 2.0), (.08, .265, .265, 2.0), (.52, .265, .265, 2.0), (.62, .19, .19, 2.0)], axis="Y",
+                          loc=(0, -.32, .5), caps=.05))                                                       # the tank
+    P.add("Accent", L.loft([(0, .272, .272, 2.0), (.04, .272, .272, 2.0)], axis="Y", loc=(0, -.02, .5)))       # weld band
+    P.add("Accent", _disc_grille((0, -.33, .5), .16))                                                         # outlet
+    for k, (x, y, h, lean) in enumerate(((-.12, -.1, .3, -14), (0, .02, .38, 0), (.12, -.1, .3, 14))):
+        base = V((x, y, .7))
+        P.add("Body", L.cyl(.05, .1, (x, y, .74)))
+        P.add("Accent", [lathe_between([(.038, 0), (.038, .7), (.06, .92), (.064, 1), (.05, 1)], base + V((0, 0, .05)),
+                                       base + V((math.sin(math.radians(lean)) * h, 0, .05 + math.cos(math.radians(lean)) * h)), seg=12)])
+    P.add("Accent", L.rod((.0, -.24, .74), (0, -.26, .9), .012))
+    P.add("Accent", L.cyl(.06, .03, (0, -.27, .93), axis="Y"))                                                # gauge
+    P.add("Body", L.cyl(.048, .012, (0, -.288, .93), axis="Y"))
+    P.add("Body", L.box((.38, .16, .3), (0, .38, .44), r=.03))                                                # compressor
+    P.add("Accent", _grille((0, .462, .44), .26, .18, n=4, axis="Y"))
+    for x in (-.12, .12):
+        P.add("Accent", [cable([(x, .38, .6), (x * 1.2, .3, .82), (x, .12, .8), (x, -.04, .78)], .018)])     # hoses
+    P.add("Accent", L.cyl(.05, .02, (.2, .38, .62), axis="Z"))                                               # valve wheel
+    P.add("Accent", [_ring((.2, .38, .66), .05, .008, axis="Z", n=12)])
+    return P
+
+
+def relay(L):
+    """The paging post: a domed enamel weighted base on the floor with a rubber foot ring, a fluted steel mast with
+    collars and a junction box, a rounded speaker housing on top with a louvred front speaker and lit indicator lamps,
+    two horn loudspeakers turned out to the sides and a whip antenna. Eye: the speakers' membranes and the lamps.
+    Concept: Logs/comfy/danger_s16/relay_*."""
+    P = D.Parts()
+    P.add("Accent", L.lathe([(0, 0), (.34, 0), (.345, .015), (.33, .03), (0, .03)]))                          # foot ring
+    P.add("Body", L.lathe([(0, .02), (.32, .02), (.33, .05), (.3, .09), (.2, .14), (.08, .17), (0, .17)]))    # domed base
+    P.add("Eye", [s.ball(.018, (math.cos(a) * .27, math.sin(a) * .27, .08), seg=8) for a in (-1.57, 0.52, 2.6)])
+    P.add("Accent", L.cyl(.06, .06, (0, 0, .19)))
+    P.add("Body", L.cyl(.04, 1.12, (0, 0, .74)))                                                              # mast
+    for z in (.32, .9, 1.22):
+        P.add("Accent", L.cyl(.055, .04, (0, 0, z)))
+    P.add("Body", L.box((.12, .08, .16), (0, -.05, .6), r=.02))                                               # junction box
+    P.add("Accent", [cable([(.02, -.05, .68), (.05, -.03, 1.0), (.04, -.02, 1.3)], .012)])
+    # the speaker housing
+    P.add("Body", L.shell([(1.28, .18, .15, 2.6), (1.36, .23, .18, 2.8), (1.58, .23, .18, 2.8), (1.66, .18, .15, 2.6)], caps=.04))
+    P.add("Accent", L.lathe([(0, 0), (.13, 0), (.135, .015), (.12, .03), (0, .03)], axis="-Y", loc=(0, -.165, 1.46)))
+    P.add("Eye", L.lathe([(.1, 0), (.075, .012), (.03, .026), (0, .03)], axis="-Y", loc=(0, -.19, 1.46)))     # membrane
+    for x in (-.12, .12):
+        P.add("Eye", L.box((.05, .02, .025), (x, -.185, 1.6), r=.006))                                       # lamps
+    P.add("Accent", L.cyl(.06, .03, (0, .02, 1.675)))
+    P.add("Eye", L.cyl(.045, .05, (0, .02, 1.71), radius2=.035))                                              # beacon
+    for sx in (-1, 1):
+        a = V((sx * math.cos(math.radians(30)), math.sin(math.radians(30)), .12)).normalized()
+        base = V((sx * .21, .0, 1.5))
+        P.add("Accent", L.cyl(.05, .08, tuple(base), axis="X"))
+        P.add("Body", [lathe_between([(.04, 0), (.045, .12), (.08, .26), (.16, .36), (.17, .38), (.15, .38), (.12, .33),
+                                      (.05, .22), (0, .2)], base, base + a, seg=16)])                       # hollow bell
+        P.add("Eye", [lathe_between([(.07, 0), (.05, .66), (0, 1)], base + a * .2, base + a * .23, seg=12)])  # throat
+    P.add("Accent", L.cyl(.03, .05, (.1, .05, 1.66)))
+    P.add("Accent", L.rod((.1, .05, 1.68), (.1, .05, 1.8), .008))
+    P.add("Eye", L.ball(.018, (.1, .05, 1.8)))
+    return P
+
+
+def _syringe(base, tip, r=.035):
+    """A big syringe from its plunger end (base) to the needle tip: a thumb ring, a plunger rod, a finger flange,
+    a barrel with graduation rings, a hub and the needle."""
+    a, b = V(base), V(tip)
+    d = (b - a).normalized()
+    L_ = (b - a).length
+    out = [lathe_between([(0, 0), (r * .9, 0), (r * .9, 1), (0, 1)], a, a + d * .014, seg=12)]
+    out.append(lathe_between([(r * .25, 0), (r * .25, 1)], a, a + d * L_ * .3, seg=8))
+    out.append(lathe_between([(0, 0), (r * 1.8, 0), (r * 1.8, .6), (r * 1.1, 1), (0, 1)], a + d * L_ * .27, a + d * L_ * .3, seg=12))
+    out.append(lathe_between([(0, 0), (r, 0), (r, .85), (r * .5, .93), (r * .3, 1), (0, 1)], a + d * L_ * .28,
+                             a + d * L_ * .86, seg=12))
+    out.append(lathe_between([(r * .14, 0), (r * .1, .9), (0, 1)], a + d * L_ * .84, b, seg=6))
+    return out
+
+
+def nurse(L):
+    """The ward nurse: a white enamel skirt shell flaring onto a round base over three hidden casters, a fitted bodice
+    with a lit name plate and a waist ring, slim arms on ring joints — the right raises a big syringe, the left ends in
+    a clamp — an egg head on a neck collar with one lens and two ear pods, a folded cap with a cross.
+    Concept: Logs/comfy/danger_s16/nurse_*."""
+    P = D.Parts()
+    _small_wheels(P, D.NURSE_WHEELS, *D.NURSE_WHEEL)
+    for x, y, _ in D.NURSE_WHEELS:
+        P.add("Accent", L.cyl(.012, .07, (x, y, .085)) + L.box((.05, .02, .04), (x, y, .07), r=.006))         # caster forks
+    P.add("Accent", L.lathe([(0, .09), (.25, .09), (.27, .11), (.27, .14), (.24, .15), (0, .15)]))            # base ring
+    P.add("Body", L.lathe([(0, .12), (.24, .12), (.26, .17), (.23, .36), (.19, .58), (.15, .8), (.13, .92), (0, .92)]))  # skirt
+    P.add("Accent", L.cyl(.14, .05, (0, 0, .94)))                                                             # waist ring
+    P.add("Body", L.shell([(.95, .13, .1, 2.4), (1.12, .16, .11, 2.6), (1.28, .21, .12, 2.6), (1.36, .2, .11, 2.4)], caps=.03))
+    P.add("Accent", L.box((.14, .03, .06), (0, -.115, 1.2), r=.01))
+    P.add("Eye", L.box((.09, .02, .025), (0, -.13, 1.2), r=.005))                                            # name plate
+    P.add("Accent", L.cyl(.055, .1, (0, 0, 1.4)))                                                            # neck collar
+    P.add("Body", L.ball(.14, (0, -.02, 1.55), scale=(1, 1.05, 1.2)))                                        # egg head
+    acc, glow = L.eye(.04, (0, -.2, 1.53), depth=.07)
+    P.add("Accent", acc).add("Eye", glow)
+    for sx in (-1, 1):
+        P.add("Accent", L.cyl(.04, .04, (sx * .14, -.02, 1.55), axis="X"))
+    P.add("Body", L.shell([(1.64, .155, .13, 3.0, 0, .0), (1.74, .16, .135, 3.0, 0, .0), (1.81, .145, .12, 3.0, 0, .01)], caps=.015))  # cap
+    P.add("Body", L.box((.3, .03, .1), (0, -.13, 1.76), r=.01, rot=(math.radians(10), 0, 0)))                # its front fold
+    P.add("Accent", L.box((.075, .02, .024), (0, -.15, 1.76), r=.005) + L.box((.024, .02, .075), (0, -.15, 1.76), r=.005))  # cross
+    for sx in (-1, 1):
+        sh = V((sx * .24, 0, 1.3))
+        P.add("Accent", L.ball(.05, tuple(sh)))
+        if sx < 0:                                                                                               # right: syringe up
+            el, wr = V((-.3, -.05, 1.08)), V((-.3, -.16, 1.3))
+        else:                                                                                                    # left: clamp
+            el, wr = V((.29, .0, 1.06)), V((.27, -.1, .9))
+        P.add("Body", L.rod(tuple(sh), tuple(el), .036) + L.rod(tuple(el), tuple(wr), .032))
+        P.add("Accent", L.ball(.04, tuple(el)) + L.box((.06, .06, .06), tuple(wr), r=.015))
+    P.add("Accent", _syringe((-.3, -.14, 1.18), (-.3, -.2, 1.72), r=.036))
+    for dx in (-.02, .02):
+        P.add("Accent", L.rod((.27 + dx, -.12, .87), (.27 + dx * 1.6, -.16, .78), .012))                      # clamp jaws
+    return P
+
+
+def _sq_bar(p0, p1, w, r=.012):
+    return align(s.rbox((w, w, (V(p1) - V(p0)).length), r=r, seg=2), V(p0), V(p1))
+
+
+def mimic(L):
+    """The crate that is not a crate. The searchable crate is the same in every style (poi.model_crate), so the mimic
+    keeps its every big form — the 3 cm walls, the two rib bands, the corner caps, the side grips, the front latches,
+    the hinged lid with its inset panel — and the tells are this style's: the front wall stops short of the lid, and in
+    that dark slot sit a comb of steel blades (lower on the wall, upper on the lid's lip) and one small deep lens in a
+    bezel; the corner angle irons are folded legs on hinge knuckles. Concept: Logs/comfy/danger_s16/mimic_*."""
+    P = D.Parts()
+    t = .03
+    body = [s.rbox((.78, .58, .05), (0, 0, .025), r=.02, seg=2)]                                      # floor
+    body += [s.rbox((t, .58, .5), (x * (.39 - t / 2), 0, .25), r=.012, seg=2) for x in (-1, 1)]       # side walls
+    body.append(s.rbox((.78 - 2 * t, t, .5), (0, .29 - t / 2, .25), r=.012, seg=2))                   # back wall
+    body.append(s.rbox((.78 - 2 * t + .01, t, .47), (0, -.29 + t / 2, .235), r=.012, seg=2))          # front: short
+    body.append(s.rbox((.7, .5, .03), (0, 0, .41), r=.01, seg=1))                                     # the slot's floor
+    for z in (.06, .44):
+        body += [s.rbox((.02, .6, .045), (x * .39, 0, z), r=.008, seg=1) for x in (-1, 1)]
+        body += [s.rbox((.8, .02, .045), (0, y * .29, z), r=.008, seg=1) for y in (-1, 1)]
+    P.add("Body", body)
+    acc = []
+    for x in (-1, 1):                                                                                  # side grips
+        acc.append(s.rbox((.03, .22, .035), (x * .405, 0, .3), r=.012, seg=2))
+        acc += [s.rbox((.04, .03, .05), (x * .395, y * .1, .3), r=.008, seg=1) for y in (-1, 1)]
+    for x in (-.22, .22):                                                                              # latches
+        acc.append(s.rbox((.08, .025, .07), (x, -.3, .4), r=.008, seg=2))
+        acc.append(s.rbox((.05, .022, .08), (x, -.307, .462), r=.008, seg=2, taper=(.6, 1.0)))
+    acc += [s.rbox((.12, .02, .06), (x, .3, .465), r=.006, seg=1) for x in (-.25, .25)]               # hinge leaves
+    for x in (-.32, -.27, -.16, -.11, .11, .16, .27, .32):                                             # lower blades
+        acc.append(s.rbox((.026, .012, .04), (x, -.278, .47), r=.003, seg=1, taper=(.25, 1.0)))
+    P.add("Accent", acc)
+    lid = s.rbox((.8, .6, .1), (0, 0, .548), r=.025, seg=3)
+    s.inset_faces(lid, s.facing((0, 0, 1), min_area=.1, tol=.95), thickness=.04, depth=-.012)
+    lidp = [lid]
+    lidp += [s.rcyl(.016, .1, (x, .3, .5), axis="X", seg=12, r=.003) for x in (-.25, .25)]           # knuckles
+    lidp += [s.rbox((.1, .016, .07), (x, .303, .54), r=.005, seg=1) for x in (-.25, .25)]            # leaves
+    lidp += [s.rbox((.06, .03, .04), (x, -.305, .53), r=.008, seg=1) for x in (-.22, .22)]           # catches
+    lidp += [s.rbox((.33, .014, .03), (x * .215, -.293, .503), r=.005, seg=1) for x in (-1, 1)]      # the lip
+    for x in (-.295, -.135, .135, .295):                                                               # upper blades
+        b = s.rbox((.026, .012, .036), (x, -.282, .487), r=.003, seg=1, taper=(1.0, 1.0))
+        s.taper(b, "Z", .25, 1.0)
+        lidp.append(b)
+    P.add("AccentLid", lidp)
+    P.add("BodySocket", [s.rcyl(.03, .03, (0, -.27, .489), axis="Y", seg=16, r=.004)])
+    P.add("Accent", [s.lathe([(.024, 0), (.026, .006), (.02, .012), (0, .012)], seg=16, axis="-Y", loc=(0, -.284, .489))])
+    P.add("Eye", [s.lathe([(.015, 0), (.015, .004), (.009, .011), (0, .013)], seg=16, axis="-Y", loc=(0, -.29, .489))])
+    for i, (cx, cy) in enumerate(D.MIMIC_CORNERS):
+        sx, sy = (1 if cx > 0 else -1), (1 if cy > 0 else -1)
+        c = V((cx, cy, 0))
+        out = V((sx, sy, 0)).normalized()
+        hip, knee, foot = c + out * -.004 + V((0, 0, .462)), c + out * .009 + V((0, 0, D.MIMIC_KNEE)), c + V((0, 0, .03))
+        leg = f"AccentLeg{i}"
+        P.add(leg, [_sq_bar(hip, knee, .074), _sq_bar(knee, foot, .078)])
+        P.add(leg, [s.rbox((.086, .086, .05), (hip.x, hip.y, .45), r=.014, seg=2)])                     # top cap
+        P.add(leg, [s.rbox((.096, .096, .11), (c.x, c.y, .055), r=.02, seg=2)])                         # foot: corner cap
+        ax = V((-sy, sx, 0)).normalized() * .04
+        k = knee + out * .006
+        P.add(leg, [align(s.rcyl(.02, .08, seg=12, r=.004, bevel_seg=1), k - ax, k + ax)])              # knee knuckle
+    P.split = {f"AccentLeg{i}": D.MIMIC_KNEE for i in range(4)}
+    return P
+
+
+def salesman(L):
+    """The vending kiosk: a tall rounded enamel cabinet on a grey plinth with four casters, a coin-and-keypad panel and
+    a louvred vent, an awning roof with alternating stripes for a hat, a deep CRT face tipped up at the camera (the
+    screen glows), a megaphone on a bent-tube bracket at its side, an arm holding out a tray of boxed wares, a price
+    flag on a whip. Concept: Logs/comfy/danger_s16/salesman_*."""
+    P = D.Parts()
+    _small_wheels(P, D.SALESMAN_WHEELS, *D.SALESMAN_WHEEL)
+    for x, y, _ in D.SALESMAN_WHEELS:
+        P.add("Accent", L.box((.05, .07, .07), (x, y, .17), r=.01) + L.cyl(.02, .09, (x, y, .09), axis="X"))  # forks
+    P.add("Accent", L.box((.6, .5, .08), (0, 0, .24), r=.025))                                          # plinth
+    P.add("Body", L.box((.48, .38, .86), (0, .02, .7), r=.05))                                          # cabinet
+    P.add("Accent", _grille((0, -.17, .42), .26, .12, n=3))
+    P.add("Accent", L.box((.14, .03, .2), (.12, -.172, .8), r=.012))                                     # keypad panel
+    for k in range(3):
+        for j in range(2):
+            P.add("Body", L.box((.035, .02, .03), (.095 + j * .05, -.188, .86 - k * .05), r=.005))
+    P.add("Body", L.box((.18, .03, .06), (-.1, -.17, .66), r=.01))                                       # pickup flap
+    # head: a deep CRT tipped up 16 degrees on a neck block
+    P.add("Accent", L.box((.2, .16, .1), (0, .02, 1.17), r=.02))
+    head = [s.rbox((.44, .2, .34), (0, -.03, 1.33), r=.04, seg=3),
+            s.rbox((.36, .24, .28), (0, .14, 1.33), r=.05, seg=2, taper=(.8, .8), rot=(math.radians(90), 0, 0))]
+    glow = [s.rbox((.34, .03, .25), (0, -.135, 1.33), r=.025, seg=2)]
+    for bm in head + glow:
+        bmesh.ops.rotate(bm, cent=V((0, -.03, 1.33)), matrix=Euler((math.radians(-16), 0, 0)).to_matrix(), verts=bm.verts)
+    P.add("Body", head).add("Eye", glow)
+    # the awning: a stepped shallow roof, eight panels alternating Body / Accent
+    roof = s.lathe([(0, 0), (.3, 0), (.31, .02), (.27, .05), (.05, .12), (0, .13)], seg=16, loc=(0, .03, 1.5))
+    P.add("Body", [roof])
+    for k in range(8):                                                                                  # stripes: wedge ribs
+        a = k / 8 * math.tau
+        if k % 2:
+            rib = s.loft([(0, .014, .035), (.24, .014, .09)], seg=8, axis="X")
+            bmesh.ops.rotate(rib, cent=V((0, 0, 0)), matrix=Euler((0, math.radians(18), a)).to_matrix(), verts=rib.verts)
+            bmesh.ops.translate(rib, vec=V((math.cos(a) * .045, .03 + math.sin(a) * .045, 1.622)), verts=rib.verts)
+            P.add("Accent", [rib])
+    P.add("Accent", L.cyl(.045, .04, (0, .03, 1.63)))
+    P.add("Accent", L.rod((.12, .06, 1.57), (.12, .06, 1.95), .008))                                    # flag whip
+    P.add("Accent", [s.rbox((.12, .01, .07), (.18, .06, 1.9), r=.004, seg=1)])
+    # megaphone on a bracket, its side
+    P.add("Accent", [bent([(-.22, .02, 1.05), (-.3, .02, 1.05), (-.3, .0, 1.3)], .014, bend=.04)])
+    mp = V((-.32, -.02, 1.32))
+    P.add("Accent", L.cyl(.03, .1, tuple(mp), axis="Y"))
+    P.add("Body", [lathe_between([(.03, 0), (.035, .3), (.1, .9), (.105, 1), (.085, 1), (0, .55)], mp + V((0, -.03, 0)),
+                                 mp + V((0, -.3, .03)), seg=16)])
+    # the tray arm
+    sh, wr = V((.25, -.05, 1.0)), V((.24, -.28, .98))
+    P.add("Accent", L.ball(.045, tuple(sh)))
+    P.add("Body", L.rod(tuple(sh), tuple(wr), .03))
+    P.add("Accent", [s.rbox((.34, .2, .02), (.12, -.33, .96), r=.006, seg=1)])                          # the tray
+    P.add("Accent", [s.rbox((.34, .012, .03), (.12, -.43, .975), r=.004, seg=1)])
+    for k, (x, y, w, h) in enumerate(((-.0, -.3, .07, .08), (.09, -.36, .06, .11), (.18, -.3, .08, .06), (.24, -.37, .05, .09))):
+        P.add("Body", [s.rbox((w, .06, h), (x, y, .97 + h / 2), r=.008, seg=1)])
+    return P
+
+
+def gunner(L):
+    """The armed guard: the station synth in pressure-suit armour — a domed chest shell over a ribbed waist, big
+    domed pauldrons, a helmet with one deep lens behind a visor ring — its right forearm replaced by a rotary gun (a
+    drum housing, six barrels, a muzzle ring), an ammo canister on its back feeding a belt over the shoulder to the
+    gun, armoured legs with knee domes and broad boots. Concept: Logs/comfy/danger_s16/gunner_*."""
+    P = D.Parts()
+    hx, hz, kz = D.GUNNER_HIP_X, D.GUNNER_HIP_Z, D.GUNNER_KNEE
+    P.add("Body", L.shell([(.86, .22, .15, 2.6), (.96, .25, .17, 2.8), (1.06, .22, .15, 2.6)], caps=.03))   # pelvis
+    P.add("Body", L.cyl(.11, .34, (0, .02, 1.14)))                                                          # waist core
+    for z in (1.08, 1.14, 1.2):
+        P.add("Accent", L.cyl(.15 - abs(z - 1.14) * .4, .045, (0, .02, z)))                                 # ribbed waist
+    P.add("Body", L.shell([(1.2, .26, .19, 2.6, 0, .01), (1.38, .36, .25, 2.8, 0, -.01), (1.58, .37, .25, 2.8),
+                           (1.72, .27, .19, 2.4)], caps=.06))                                                   # chest dome
+    P.add("Accent", L.box((.22, .04, .12), (0, -.245, 1.42), r=.015))                                       # chest hatch
+    P.add("Eye", L.box((.12, .02, .02), (0, -.262, 1.52), r=.005))
+    P.add("Accent", L.cyl(.09, .1, (0, 0, 1.74)))                                                           # neck ring
+    P.add("Body", L.ball(.17, (0, -.02, 1.87), scale=(1, 1.1, .95)))                                      # helmet
+    P.add("Accent", L.cyl(.175, .04, (0, -.02, 1.95), rot=(math.radians(-8), 0, 0)))                      # brow band
+    P.add("Accent", L.lathe([(0, 0), (.075, 0), (.08, .015), (.075, .03), (0, .03)], axis="-Y", loc=(0, -.18, 1.84)))  # visor ring
+    acc, glow = L.eye(.05, (0, -.23, 1.84), depth=.06)
+    P.add("Accent", acc).add("Eye", glow)
+    # ammo canister on the back, the belt over the right shoulder to the gun
+    P.add("Body", L.box((.38, .2, .34), (0, .32, 1.42), r=.04))
+    P.add("Accent", L.box((.4, .22, .04), (0, .32, 1.5), r=.01))
+    belt = [V((-.18, .25, 1.56)), V((-.3, .12, 1.66)), V((-.44, -.04, 1.55)), V((-.5, -.2, 1.26)), V((-.5, -.3, 1.18))]
+    P.add("Accent", [s.tube([tuple(p) for p in belt], .028, res=1, segments_per=4)])
+    for sx in (-1, 1):
+        sh = V((sx * .44, 0, 1.58))
+        P.add("Body", L.ball(.17, (sx * .46, 0, 1.64), scale=(1, 1.1, .8)))                                # pauldron
+        P.add("Accent", L.cyl(.18, .03, (sx * .47, 0, 1.58), rot=(0, math.radians(18 * sx), 0)))
+        el = V((sx * .5, -.06, 1.18)) if sx > 0 else V((-.5, -.18, 1.12))
+        P.add("Body", L.rod(tuple(sh), tuple(el), .07))
+        P.add("Accent", L.ball(.075, tuple(el)))
+        if sx > 0:                                                                                           # left: forearm and fist
+            P.add("Body", L.shell([(.86, .07, .075, 2.4, .5, -.12), (1.02, .085, .09, 2.6, .5, -.09), (1.16, .07, .075, 2.4, .5, -.06)], caps=.02))
+            P.add("Accent", L.box((.12, .14, .14), (.5, -.13, .8), r=.03))
+    # the rotary gun on the right forearm
+    gx, gz = -.5, 1.1
+    P.add("Body", L.shell([(0, .1, .1, 2.2), (.12, .11, .11, 2.2), (.3, .09, .09, 2.2)], axis="-Y", loc=(gx, -.16, gz), caps=.03))
+    P.add("Accent", L.cyl(.085, .05, (gx, -.48, gz), axis="Y") + L.cyl(.07, .04, (gx, -.75, gz), axis="Y"))  # barrel clamps
+    for k in range(6):
+        a = k / 6 * math.tau
+        P.add("Accent", L.cyl(.017, .52, (gx + math.cos(a) * .045, -.72, gz + math.sin(a) * .045), axis="Y", seg=8))
+    P.add("Accent", L.cyl(.02, .53, (gx, -.72, gz), axis="Y", seg=8))
+    P.add("Accent", [s.lathe([(.05, 0), (.075, 0), (.075, .04), (.05, .04)], seg=16, axis="-Y", loc=(gx, -.94, gz))])  # muzzle ring
+    for sx, leg in ((-1, "AccentLeg0"), (1, "AccentLeg1")):
+        x = sx * hx
+        P.add(leg, L.ball(.1, (x, 0, hz)))
+        P.add(leg, L.shell([(kz + .02, .09, .1, 2.6, x, 0), (.7, .12, .13, 2.8, x, -.005), (hz, .11, .12, 2.6, x, 0)], caps=.03))
+        P.add(leg, L.ball(.09, (x, -.04, kz)))                                                                # knee dome
+        P.add(leg, L.shell([(.1, .08, .09, 2.6, x, 0), (.3, .1, .12, 2.8, x, .015), (kz - .01, .085, .095, 2.6, x, 0)], caps=.03))
+        P.add(leg, L.shell([(0, .1, .19, 2.6, x, -.06), (.09, .095, .18, 2.6, x, -.06), (.14, .07, .1, 2.4, x, -.02)], caps=.025))
+    P.split = {"AccentLeg0": kz, "AccentLeg1": kz}
+    return P
+
+
+def driller(L):
+    """The breaching crawler: a low enamel hull with a grey skirt on two crawler tracks, a fluted cone drill on a
+    round gearbox out in front carried by two hydraulic rams, a camera box on a post with a lit visor slit, a louvred
+    engine deck and two exhaust stacks behind. The drill (AccentDrill) is round about its axis: it spins.
+    Concept: Logs/comfy/danger_s16/driller_*."""
+    P = D.Parts()
+    for sx in (-1, 1):                                    # (the style's track() lays its belt on edge: build it here)
+        x, w, d, r = sx * .4, .22, 1.0, .21
+        P.add("BodyTracks", [s.loft([(-w / 2, r, d / 2, 6.0), (w / 2, r, d / 2, 6.0)], seg=16, axis="X", loc=(x, .1, r))])
+        for k in range(4):
+            P.add("BodyTracks", [s.rcyl(r * .62, w * 1.1, (x, .1 - d / 2 + r + (d - 2 * r) * k / 3, r), axis="X", seg=12, r=.008, bevel_seg=1)])
+    P.add("Accent", L.box((.56, .9, .14), (0, .1, .3), r=.03))                                              # grey skirt
+    P.add("Body", L.shell([(.34, .3, .44, 3.2, 0, .12), (.6, .33, .46, 3.4, 0, .12), (.74, .28, .4, 3.0, 0, .14)], caps=.05))  # hull
+    for sx in (-1, 1):
+        P.add("Body", L.box((.12, .9, .06), (sx * .4, .1, .44), r=.02))                                     # track guards
+    P.add("Accent", L.box((.4, .3, .03), (0, .32, .755), r=.01))                                            # engine deck
+    for x in (-.12, -.04, .04, .12):
+        P.add("Body", L.box((.03, .26, .02), (x, .32, .775), r=.006))                                       # its louvres
+    for sx in (-1, 1):
+        P.add("Accent", L.cyl(.035, .3, (sx * .2, .48, .9)))                                                # exhaust stacks
+        P.add("Body", L.cyl(.045, .04, (sx * .2, .48, 1.05)))
+    # the drill head: a gearbox drum, the rams from the hull, the cone
+    P.add("Body", L.shell([(0, .2, .2, 2.0), (.06, .22, .22, 2.0), (.16, .2, .2, 2.0)], axis="-Y", loc=(0, -.22, .62), caps=.03))
+    for sx in (-1, 1):
+        P.add("Accent", L.rod((sx * .2, -.1, .56), (sx * .17, -.3, .62), .03, kind="piston"))
+    P.add("AccentDrill", L.cyl(.08, .05, (0, -.385, .62), axis="Y"))                                             # hub into the gearbox
+    P.add("AccentDrill", [s.lathe([(0, 0), (.27, 0), (.295, .02), (.295, .07), (.27, .09)], seg=20, axis="-Y", loc=(0, -.39, .62))])
+    P.add("AccentDrill", [s.lathe([(.27, 0), (.2, .14), (.11, .3), (.03, .42), (0, .43)], seg=20, axis="-Y", loc=(0, -.47, .62))])
+    flute = []
+    for k in range(43):                                                                                       # one spiral flute
+        t = k / 42
+        y = -.48 - .4 * t
+        rr = .27 - .25 * t + .006
+        a = t * math.tau * 2.2
+        flute.append((math.cos(a) * rr, y, .62 + math.sin(a) * rr))
+    P.add("AccentDrill", [s.tube(flute, .016, res=1, segments_per=2, radii=[1.0] * 30 + [.8, .7, .6, .5, .4, .35, .3, .25, .2, .15, .1, .08, .05])])
+    # the camera on a post
+    P.add("Accent", L.cyl(.05, .1, (0, -.06, .79)) + L.cyl(.025, .25, (0, -.06, .95)))
+    P.add("Body", L.box((.24, .2, .14), (0, -.1, 1.15), r=.03))
+    P.add("Accent", L.box((.2, .04, .06), (0, -.19, 1.15), r=.012))
+    P.add("Eye", L.box((.15, .02, .022), (0, -.212, 1.15), r=.006))                                         # visor slit
+    P.add("Accent", L.rod((.09, -.05, 1.2), (.09, -.05, 1.38), .007))
+    return P
+
+
+def exterminator(L):
+    """The pest-control cart: a rounded enamel body on a four-wheel tube chassis, a gas-mask head with one big lens and
+    a filter canister for a snout, two tall gas cylinders on the back with hazard bands, hoses up to two spray booms
+    curving out and up with nozzles and a third nozzle straight up, a striped bumper. Concept:
+    Logs/comfy/danger_s16/exterminator_*."""
+    P = D.Parts()
+    D.wheels(P, L, D.EXTERMINATOR_WHEELS, *D.EXTERMINATOR_WHEEL)
+    for sx in (-1, 1):
+        P.add("Accent", [_bent([(sx * .26, -.36, .26), (sx * .26, -.24, .2), (sx * .26, .24, .2), (sx * .26, .36, .26)], .025, bend=.05)])
+        for y in (-.24, .24):
+            P.add("Accent", L.cyl(.035, .12, (sx * .3, y, .14), axis="X"))
+            P.add("Body", L.box((.06, .1, .12), (sx * .26, y, .17), r=.015))
+    for y in (-.24, .24):
+        P.add("Accent", [s.tube([(-.26, y, .2), (.26, y, .2)], .022, res=2, smooth=False)])
+    P.add("Accent", L.box((.5, .56, .06), (0, 0, .22), r=.015))                                             # deck
+    P.add("Body", L.box((.62, .14, .08), (0, -.4, .24), r=.03))                                              # bumper
+    for k in range(5):
+        P.add("Accent", L.box((.05, .02, .07), (-.22 + k * .11, -.475, .24), r=.006, rot=(0, math.radians(30), 0)))
+    P.add("Body", L.shell([(.22, .26, .22, 3.0), (.3, .3, .26, 3.2), (.78, .29, .25, 3.2), (.9, .23, .2, 2.8)], caps=.05))  # body
+    P.add("Accent", L.loft([(.28, .305, .265, 3.2), (.36, .305, .265, 3.2)]))
+    P.add("Accent", _grille((.12, -.252, .6), .18, .2, n=4))
+    P.add("Body", L.box((.12, .03, .1), (-.14, -.25, .62), r=.012))                                         # service hatch
+    # the gas mask head
+    P.add("Accent", L.cyl(.12, .06, (0, -.02, .92)))
+    P.add("Body", L.ball(.16, (0, -.06, 1.06), scale=(1, 1.0, 1.05)))
+    P.add("Body", L.shell([(0, .13, .12, 2.4), (.06, .14, .13, 2.6)], axis="-Y", loc=(0, -.14, 1.05), caps=.02))  # face plate
+    acc, glow = L.eye(.055, (0, -.24, 1.06), depth=.06)
+    P.add("Accent", acc).add("Eye", glow)
+    P.add("Accent", L.cyl(.05, .1, (0, -.24, .93), axis="Y", rot=(math.radians(-30), 0, 0)))                # snout
+    P.add("Body", L.cyl(.07, .08, (0, -.31, .9), axis="Y", rot=(math.radians(-30), 0, 0)))                  # filter can
+    for sx in (-1, 1):
+        P.add("Body", L.cyl(.055, .07, (sx * .15, -.14, .96), axis="X"))                                    # side filters
+    # the tanks
+    for sx in (-1, 1):
+        x = sx * .17
+        P.add("Body", L.lathe([(0, 0), (.11, 0), (.12, .03), (.12, .62), (.09, .72), (.04, .76), (0, .76)], loc=(x, .3, .42)))
+        P.add("BodyBands", L.cyl(.125, .05, (x, .3, .58)) + L.cyl(.125, .05, (x, .3, .88)))
+        P.add("Accent", L.cyl(.025, .06, (x, .3, 1.2)) + L.cyl(.04, .02, (x, .3, 1.23)))                   # valves
+        P.add("Body", L.box((.06, .1, .05), (x, .2, .5), r=.01))                                            # straps
+    # the booms
+    for sx in (-1, 1):
+        p0 = V((sx * .2, .1, .9))
+        pts = [p0, V((sx * .34, .05, 1.0)), V((sx * .44, -.05, 1.18)), V((sx * .46, -.12, 1.36))]
+        P.add("BodyBooms", [s.tube([tuple(p) for p in pts], .028, res=1, segments_per=4)])
+        P.add("BodyBooms", L.cyl(.04, .06, tuple(p0), axis="X"))
+        P.add("Accent", [lathe_between([(.03, 0), (.03, .5), (.05, 1), (0, 1)], pts[-1] + V((0, .02, -.06)), pts[-1] + V((0, -.08, .04)), seg=10)])
+        P.add("Accent", [cable([(sx * .17, .3, 1.2), (sx * .26, .2, 1.18), (sx * .36, .02, 1.06)], .016)])
+    P.add("BodyBooms", L.rod((0, .12, .88), (0, .12, 1.25), .022))
+    P.add("Accent", L.cyl(.035, .08, (0, .12, 1.28), radius2=.05))
+    return P
+
+
+def banshee(L):
+    """The wailer: a tall slim station synth over an enamel hover cone with a lit ring at its foot — a coiled spring
+    waist, a chest shell with a louvred amplifier vent, long thin arms hanging past the hips with claw fingers, and for
+    a head a cluster of paging horns on a neck collar: two forward (their throats glow: the eyes), two to the sides,
+    two up and out; loose cables hang from the cluster. Concept: Logs/comfy/danger_s16/banshee_*."""
+    P = D.Parts()
+    P.add("Accent", L.lathe([(0, 0), (.24, 0), (.26, .015), (.25, .05), (0, .05)]))                         # hover ring
+    P.add("Body", L.lathe([(0, .04), (.25, .04), (.26, .08), (.22, .4), (.17, .7), (.13, .9), (0, .9)]))    # the cone
+    P.add("Eye", [s.ball(.018, (math.cos(a) * .238, math.sin(a) * .238, .12), seg=8) for a in (-1.57, -.5, .6, 1.57, 2.6, -2.6)])
+    for k in range(5):
+        P.add("Accent", L.cyl(.1 - abs(k - 2) * .008, .03, (0, 0, .94 + k * .05), seg=12))                          # spring waist
+    P.add("Body", L.cyl(.05, .3, (0, 0, 1.04)))
+    P.add("Body", L.shell([(1.14, .15, .11, 2.4), (1.3, .2, .13, 2.6), (1.5, .22, .14, 2.6), (1.6, .17, .12, 2.4)], caps=.04))
+    P.add("Accent", _grille((0, -.135, 1.38), .16, .14, n=4))
+    P.add("Accent", L.cyl(.06, .1, (0, 0, 1.65)))                                                            # neck collar
+    P.add("Body", L.ball(.085, (0, -.01, 1.76)))                                                             # horn hub
+    horns = [((-1, -.18, .0), .33, .1, True), ((1, -.18, .0), .33, .1, True),
+             ((-1, .35, .1), .22, .06, False), ((1, .35, .1), .22, .06, False),
+             ((-.5, .2, 1), .22, .055, False), ((.5, .2, 1), .22, .055, False)]
+    for (sx, dy, dz), ln, bell, front in horns:
+        if front:
+            base = V((sx * .045, -.03, 1.8))
+            d = V((sx * .32, -1, .0)).normalized()
+        else:
+            base = V((sx * .06, 0, 1.78 + dz * .04))
+            d = V((sx, dy, dz)).normalized()
+        P.add("Accent", [lathe_between([(.03, 0), (.032, .3), (bell * .6, .7), (bell, .96), (bell * 1.04, 1), (bell * .85, 1),
+                                        (bell * .55, .82), (0, .65)], base, base + d * ln, seg=12)])
+        P.add("Eye", [lathe_between([(bell * .5, 0), (bell * .35, .5), (0, 1)], base + d * ln * .64, base + d * ln * .7, seg=12)])
+    for k, (x, y) in enumerate(((-.07, .06), (.05, .07), (.08, .02), (-.04, .08))):                         # hanging cables
+        P.add("Accent", [s.tube([(x * .6, y * .6, 1.76), (x * 1.3, y * 1.2, 1.66), (x * 1.6, y * 1.4, 1.5 - .04 * k)], .009, res=1, segments_per=2)])
+    for sx in (-1, 1):
+        sh, el, wr = V((sx * .24, 0, 1.54)), V((sx * .28, .02, 1.1)), V((sx * .27, -.04, .66))
+        P.add("Accent", L.ball(.045, tuple(sh)) + L.ball(.035, tuple(el)))
+        P.add("Body", L.rod(tuple(sh), tuple(el), .026) + L.rod(tuple(el), tuple(wr), .022))
+        P.add("Accent", L.box((.05, .05, .06), tuple(wr), r=.012))
+        for dx in (-.018, 0, .018):
+            P.add("Accent", [lathe_between([(.008, 0), (.006, .7), (0, 1)], wr + V((dx, -.01, -.02)), wr + V((dx * 1.6, -.05, -.18)), seg=6)])
+    return P
+
+
+def maniac(L):
+    """The hunter: a lanky synth bent forward — long thin legs on ring joints with long three-toed feet, a narrow
+    pelvis, a spine of collars into a heavy hunched shoulder shell, a long narrow head thrust forward on its neck with
+    one small cold lens, long arms past its knees ending in a hook (left) and a three-claw clamp (right), and across its
+    back an empty cradle of bent steel tube — a bed of slats between two rails — where a carried player lies.
+    Concept: Logs/comfy/danger_s16/maniac_*."""
+    P = D.Parts()
+    hx, hz, kz = D.MANIAC_HIP_X, D.MANIAC_HIP_Z, D.MANIAC_KNEE
+    P.add("Body", L.shell([(.98, .19, .11, 2.6, 0, .02), (1.08, .21, .12, 2.8, 0, .02), (1.16, .16, .1, 2.6, 0, .01)], caps=.03))  # pelvis
+    spine = [V((0, .02, 1.16)), V((0, .0, 1.3)), V((0, -.04, 1.42))]
+    for k, p in enumerate(spine):
+        P.add("Accent", L.cyl(.075 - k * .005, .05, tuple(p)))
+    P.add("Body", L.rod((0, .02, 1.1), (0, -.06, 1.5), .045))
+    P.add("Body", L.shell([(1.4, .2, .14, 2.6, 0, -.08), (1.52, .3, .18, 2.8, 0, -.09), (1.63, .32, .16, 2.8, 0, -.08),
+                           (1.7, .25, .11, 2.4, 0, -.07)], caps=.04))                                        # hunched shoulders
+    P.add("Eye", L.box((.1, .03, .02), (0, -.262, 1.55), r=.005))
+    # the neck and the long head
+    P.add("Accent", L.rod((0, -.12, 1.66), (0, -.22, 1.73), .04))
+    P.add("Body", L.shell([(0, .08, .09, 2.4), (.1, .095, .1, 2.6), (.2, .075, .08, 2.4), (.235, .05, .055, 2.0)], axis="-Y",
+                          loc=(0, -.13, 1.75), caps=.02))
+    acc, glow = L.eye(.024, (0, -.36, 1.735), depth=.04)
+    P.add("Accent", acc).add("Eye", glow)
+    # the cradle on its back: two rails and slats under and round the clear box (+-0.2, 0.07..0.22, 1.73..1.86)
+    (x0, y0, z0), (x1, y1, z1) = D.MANIAC_CLEAR
+    for y in (y0 - .025, y1 + .025):
+        P.add("Accent", [_bent([(-.3, y, z1 + .02), (-.3, y, z0 - .03), (.3, y, z0 - .03), (.3, y, z1 + .02)], .016, bend=.06)])
+    for x in (-.24, -.12, 0, .12, .24):
+        P.add("Accent", [s.tube([(x, y0 - .03, z0 - .035), (x, y1 + .03, z0 - .035)], .013, res=2, smooth=False)])
+    for sx in (-1, 1):
+        P.add("Accent", L.rod((sx * .16, -.02, 1.62), (sx * .2, y0 - .02, z0 - .04), .022))                 # brackets
+    # arms
+    for sx in (-1, 1):
+        sh, el, wr = V((sx * .34, -.08, 1.6)), V((sx * .38, -.1, 1.18)), V((sx * .34, -.2, .76))
+        P.add("Body", L.ball(.08, tuple(sh)))
+        P.add("Body", L.rod(tuple(sh), tuple(el), .036) + L.rod(tuple(el), tuple(wr), .03))
+        P.add("Accent", L.ball(.045, tuple(el)) + L.box((.07, .07, .08), tuple(wr), r=.018))
+        if sx > 0:                                                                                           # left: the hook
+            P.add("Accent", L.rod(tuple(wr), tuple(wr + V((0, -.02, -.14))), .014))
+            P.add("Accent", [_poly_arc(wr + V((0, -.07, -.18)), .055, -10, 200, .014, "YZ", 8)])
+        else:                                                                                                # right: the clamp
+            for a in (0, 2.1, 4.2):
+                d = V((math.cos(a) * .04, math.sin(a) * .04 - .01, 0))
+                P.add("Accent", [lathe_between([(.012, 0), (.009, .6), (0, 1)], wr + d * .5 + V((0, 0, -.03)), wr + d * 1.6 + V((0, -.02, -.2)), seg=6)])
+    for sx, leg in ((-1, "AccentLeg0"), (1, "AccentLeg1")):
+        x = sx * hx
+        P.add(leg, L.ball(.07, (x, .02, hz)))
+        P.add(leg, L.shell([(kz + .02, .045, .05, 2.4, x, .02), (.8, .06, .065, 2.6, x, .02), (hz - .02, .055, .06, 2.4, x, .02)], caps=.02))
+        P.add(leg, L.ball(.055, (x, .0, kz)))
+        P.add(leg, L.rod((x, .02, kz), (x, .03, .07), .035))
+        P.add(leg, L.ball(.04, (x, .03, .07)))
+        for dx, dy in ((-.04, -.16), (0, -.19), (.04, -.16), (0, .07)):                                      # three toes and a spur
+            P.add(leg, [lathe_between([(.02, 0), (.015, .7), (0, 1)], (x, .03, .06), (x + dx, .03 + dy, .015), seg=6)])
+    P.split = {"AccentLeg0": kz, "AccentLeg1": kz}
+    return P
+
+
 DESIGNS = {
     "robot_guard": guard, "robot_spider": spider,
     "robot_listener": listener, "robot_worker": worker, "robot_sweeper": sweeper, "robot_thumper": thumper,
     "robot_sorter": sorter, "robot_drone": drone, "robot_turret": turret, "robot_vacuum": vacuum,
     "sensor_plate": plate, "attach_mic": attach_mic,
+    "robot_warden": warden, "robot_repairman": repairman, "robot_smoker": smoker, "robot_relay": relay,
+    "robot_nurse": nurse, "robot_mimic": mimic, "robot_salesman": salesman, "robot_gunner": gunner,
+    "robot_driller": driller, "robot_exterminator": exterminator, "robot_banshee": banshee, "robot_maniac": maniac,
 }
 
 
