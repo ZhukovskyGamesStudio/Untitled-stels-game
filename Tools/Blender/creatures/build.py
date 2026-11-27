@@ -41,11 +41,9 @@ for _mod in ("walkers", "rollers", "devices"):
 # new models with no original to compare with
 NEW = {"robot_storage", "robot_thumper"}  # (the thumper walks on legs of its own: not fitted to the old tracked model's parts)
 
-# the original's object origins that are not the world origin (poi.py builds the warden with pivots on its parts)
-ORIGINS = {
-    "robot_warden": {"AccentHead": (0, 0, 1.3), "AccentWheel0": (-.24, -.2, .085), "AccentWheel1": (.24, -.2, .085),
-                     "AccentWheel2": (-.24, .2, .085), "AccentWheel3": (.24, .2, .085)},
-}
+# the original's object origins that are not the world origin, per model: {part: (x, y, z)} (none at the moment: the
+# old warden of poi.py had them; the new one is danger_bots_a.py's and not a creature)
+ORIGINS = {}
 
 
 def set_origin(obj, origin):

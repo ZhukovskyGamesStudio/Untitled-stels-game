@@ -191,7 +191,7 @@ namespace Stealth.EditorTools
                 t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 1.8f; t.ChaseSpeed = 1.8f;
                 t.Role = RobotRole.Warden; t.RolePeriod = 12f; t.RoleRadius = 14f; t.RoleLimit = 3; // three locks set again per house
             }));
-            robot(RobotKind.Repairman, RobotPrefabs + "/RobotRepairman.prefab", () => MobileRobot("RobotRepairman", ModelOr("robot_repairman", "robot_thumper"), "WorkerBody", 0.4f, new Vector3(-0.15f, 0.58f, 0.22f), ripple, (s, t, anim) =>
+            robot(RobotKind.Repairman, RobotPrefabs + "/RobotRepairman.prefab", () => MobileRobot("RobotRepairman", ModelOr("robot_repairman", "robot_thumper"), "WorkerBody", 0.4f, new Vector3(0.15f, 0.58f, 0.22f), ripple, (s, t, anim) =>
             {
                 s.ViewDistance = 8f; s.ViewAngle = 90f; s.DetectionSpeed = 0.45f; s.HearingMultiplier = 0.4f;
                 t.CanAttack = false; t.WarningTime = 3f; t.AlarmRadius = 35f;

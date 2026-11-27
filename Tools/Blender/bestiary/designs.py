@@ -278,6 +278,57 @@ def worker_beacon(L, P, loc=(0, .26, 1.34)):
     P.add("Eye", L.cyl(.055, .075, (x, y, z + .07), radius2=.045))
 
 
+def warehouse_icon(w=.17, bar=.02, proud=.008):
+    """The loot hauler's pictogram (a box standing on a pallet), centred on the origin in the x-z plane, facing -y,
+    `proud` deep: the box as an outline with a tape line down its top half, the pallet a deck board on three feet.
+    w is its width; it is w * 0.9 tall. Returns bmeshes."""
+    k = w / .17
+    out = []
+
+    def bx(u, v, du, dv):
+        out.append(s.rbox((du * k, proud, dv * k), (u * k, -proud / 2, v * k), r=min(.003, bar * .2), seg=1))
+    b = bar / k
+    # the box: an outline .12 x .085, its tape line
+    bx(0, .062, .12, b)
+    bx(0, -.012, .12, b)
+    for su in (-1, 1):
+        bx(su * (.06 - b / 2), .025, b, .085)
+    bx(0, .04, b * .8, .044)
+    # the pallet: a deck board wider than the box, three feet under it
+    bx(0, -.04, .17, b * 1.1)
+    for u in (-.07, 0, .07):
+        bx(u, -.062, .03, .024)
+    return out
+
+
+def worker_plaque(L, P, loc=(0, -.445, .25), w=.24, h=.15, tilt=32, plate="Accent", icon="Eye", frame=None,
+                  frame_role=None):
+    """The worker's warehouse plaque — players read it as the loot hauler: a plate on the front of the deck like a
+    number plate, tipped back by `tilt` degrees towards the camera above, the pictogram glowing on it (Eye). loc is the
+    plate's back face centre. Why there: the pod's face carries the camera module (0, -0.48, 0.5), the tray at rest
+    hides the mast and the pod's top from above; in front of the deck the lift never comes lower than z 1.18 above
+    y -0.5 (it lands at y -0.6 and beyond) and the ground probes stand at x +-0.34. frame(w, h, d) -> extra pieces in
+    the plate's frame (a style's rim, in frame_role or the plate's)."""
+    rot = (math.radians(-tilt), 0, 0)
+    d = .022
+    pieces = [s.rbox((w, d, h), (0, -d / 2, 0), r=0 if L.flat else .006, seg=1)]
+    rim = frame(w, h, d) if frame else []
+    glyph = warehouse_icon(min(w * .72, h * 1.0), bar=max(.016, h * .12), proud=.008)
+    for bm in glyph:
+        bmesh_shift(bm, (0, -d, 0))
+    for bm in pieces + glyph + rim:
+        s.place(bm, loc, rot)
+    P.add(plate, pieces).add(icon, glyph)
+    if rim:
+        P.add(frame_role or plate, rim)
+
+
+def bmesh_shift(bm, v):
+    for vert in bm.verts:
+        vert.co += Vector(v)
+    return bm
+
+
 def worker(L, deck=worker_deck, pod=worker_pod, mast=worker_mast, dock=worker_dock, beacon=worker_beacon, wheel=None,
            extra=None):
     """Warehouse runner, 1.4 m: a drive deck on four small wheels with bumpers, a sensor pod in front carrying the
@@ -581,12 +632,71 @@ def attach_nose(L):
     return P
 
 
+# =========================================================================== the danger-zone robots (contract only)
+# Their base models are Tools/Blender/danger_bots_a/b/c.py (not designs of this file): DESIGNS maps them to None, so
+# build_bestiary builds one only for a style that has its own design (DESIGNS["robot_warden"] = fn in the style file),
+# and the style without one shows the base model. The numbers below are the base models' (Blender axes; Unity =
+# (-x, z, -y)); build_bestiary checks them (part names, wheel centres, legs, ANCHORS there).
+DANGER = ("robot_warden", "robot_repairman", "robot_smoker", "robot_relay", "robot_nurse", "robot_mimic",
+          "robot_salesman", "robot_gunner", "robot_driller", "robot_exterminator", "robot_banshee", "robot_maniac")
+
+# wheels: [(x, y, z) centres in AccentWheel0.. order], radius, width (they spin about X round their bounds' centre)
+WARDEN_WHEELS, WARDEN_WHEEL = [(-.22, -.17, .085), (.22, -.17, .085), (-.22, .17, .085), (.22, .17, .085)], (.085, .07)
+SMOKER_WHEELS, SMOKER_WHEEL = [(-.27, -.2, .1), (.27, -.2, .1), (-.27, .2, .1), (.27, .2, .1)], (.1, .07)
+NURSE_WHEELS, NURSE_WHEEL = [(0, -.17, .05), (-.15, .085, .05), (.15, .085, .05)], (.05, .04)          # casters
+SALESMAN_WHEELS, SALESMAN_WHEEL = [(-.25, -.2, .09), (.25, -.2, .09), (-.25, .2, .09), (.25, .2, .09)], (.09, .07)
+EXTERMINATOR_WHEELS, EXTERMINATOR_WHEEL = [(-.36, -.24, .14), (.36, -.24, .14), (-.36, .24, .14), (.36, .24, .14)], (.14, .1)
+
+# the base models' camera lenses (AssetBuilder.Danger puts the sensor origin by them): keep an Eye lens there, facing -y
+# (the salesman's Eye is its screen face, the banshee's the throats of the two forward horns at x ~+-0.08)
+DANGER_EYES = {"robot_warden": (0, -.27, 1.2), "robot_repairman": (-.15, -.22, .58), "robot_nurse": (0, -.25, 1.53),
+               "robot_mimic": (0, -.28, .49), "robot_salesman": (0, -.17, 1.33), "robot_gunner": (0, -.27, 1.84),
+               "robot_driller": (0, -.2, 1.15), "robot_exterminator": (0, -.25, 1.04), "robot_banshee": (0, -.2, 1.8),
+               "robot_maniac": (0, -.37, 1.735)}
+# (the smoker has no Eye part: it senses nothing; the relay's Eye is its speakers and lamps)
+
+
+def repairman_leg(i):
+    """Hip, knee, ankle and foot (on the floor) of the repairman's leg i — 0: (-x, front), 1: (+x, front),
+    2: (-x, back), 3: (+x, back). The knee rises above the box's lid (AccentLeg{i}Upper = hip to knee, Lower = knee
+    to foot, built as two parts: the knee is higher than the hip)."""
+    sx, sy = (-1, 1, -1, 1)[i], (-1, -1, 1, 1)[i]
+    return (Vector((sx * .25, sy * .11, .27)), Vector((sx * .3, sy * .16, .5)), Vector((sx * .32, sy * .19, .22)),
+            Vector((sx * .29, sy * .2, 0)))
+
+
+# the mimic: the searchable crate's double, 0.8 x 0.6 x 0.6 (poi.model_crate), the lid AccentLid with its origin on the
+# hinge line (the build gives it the original's origin), four corner-bracket legs (order as the repairman's) split at
+# MIMIC_KNEE: hip under the lid z 0.462, foot = the corner cap on the floor; the seam with the eye at z ~0.49 in front
+MIMIC_BOX, MIMIC_HINGE, MIMIC_KNEE = (.8, .6, .6), (0, .3, .5), .25
+MIMIC_CORNERS = [(-.372, -.272), (.372, -.272), (-.372, .272), (.372, .272)]
+
+# the gunner: the guard's legs, heavier — hips (-+0.24, 0, 0.92), AccentLeg0 at -x, knee cut 0.46, feet forward on the
+# floor; the rotary gun replaces the robot's right forearm (Blender -x), its muzzle at GUNNER_MUZZLE (the game's Muzzle
+# child shoots from there: nothing in front of it)
+GUNNER_HIP_X, GUNNER_HIP_Z, GUNNER_KNEE = .24, .92, .46
+GUNNER_MUZZLE = (-.5, -.99, 1.1)
+
+# the driller: tracks BodyTracks at x +-0.4 (0.22 wide, 1.0 long from y -0.4 to 0.6, 0.42 high), the drill AccentDrill
+# along -y on the axis x 0, z 0.62 (the integrator may spin it about that axis: keep it round), base y -0.39, tip -0.9,
+# radius 0.295
+DRILL_AXIS_Z, DRILL_BASE_Y, DRILL_TIP_Y, DRILL_R = .62, -.39, -.9, .295
+
+# the banshee hovers 0.3 m up (the game lifts it): the bottom of its hover skirt is the pivot, z 0; ~2.0 m tall
+# the maniac: hips (-+0.15, 0.02, 1.04), knee cut 0.52, feet on the floor; the cradle on its back holds a carried
+# player across it (along x) at MANIAC_SEAT: keep the box MANIAC_CLEAR free of geometry, bars round it
+MANIAC_HIP_X, MANIAC_HIP_Z, MANIAC_KNEE = .15, 1.04, .52
+MANIAC_SEAT, MANIAC_CLEAR = (0, .15, 1.72), ((-.2, .07, 1.73), (.2, .22, 1.86))
+# the relay is a static device (no moving parts), 1.8 m on a weighted base r ~0.34; the warden, smoker, salesman and
+# exterminator roll, the nurse glides on three casters under its skirt
+
 # name of the original model -> design
 DESIGNS = {
     "robot_guard": guard, "robot_spider": spider, "robot_listener": listener,
-    "robot_worker": worker, "robot_sweeper": sweeper, "robot_thumper": thumper, "robot_sorter": sorter,
+    "robot_worker": lambda L: worker(L, extra=worker_plaque), "robot_sweeper": sweeper, "robot_thumper": thumper, "robot_sorter": sorter,
     "robot_drone": drone, "robot_turret": turret, "robot_vacuum": vacuum,
     "sensor_lidar": lidar, "sensor_pir": pir, "sensor_plate": plate, "security_camera": security_camera,
     "laser_emitter": laser_emitter, "attach_eye": attach_eye, "attach_mic": attach_mic,
     "attach_seismic": attach_seismic, "attach_nose": attach_nose, "worker_lift": worker_lift,
 }
+DESIGNS.update({name: None for name in DANGER})   # no shared design: built only where a style has its own

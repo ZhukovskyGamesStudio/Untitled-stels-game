@@ -179,11 +179,18 @@ def worker_beacon(L, P, loc=(0, .26, 1.34)):
 
 
 def worker(L):
-    """A beetle, 1.4 m: a low oval belly on four wheels, an armoured prothorax in front carrying the mandibles'
-    shoulders, two domed wing-cases with a glowing seam, a neck rising to the head right behind the tray, so at rest
-    the tray is its jaw and the booms (worker_lift) its mandibles. Contract: designs.worker's plan (deck, pod, mast, dock, beacon)."""
+    """A beetle, 1.4 m: a low oval belly on four wheels with the warehouse plaque in front, an armoured prothorax
+    carrying the mandibles' shoulders, two domed wing-cases with a glowing seam, a neck rising to the head right behind
+    the tray, so at rest the tray is its jaw and the booms (worker_lift) its mandibles. Contract: designs.worker's plan
+    (deck, pod, mast, dock, beacon)."""
     return D.worker(L, deck=worker_belly, pod=worker_pod, mast=worker_shell, dock=worker_dock, beacon=worker_beacon,
-                    wheel=lambda c, r, w: small_wheel(c, r, w, seg=16))
+                    wheel=lambda c, r, w: small_wheel(c, r, w, seg=16), extra=worker_plaque)
+
+
+def worker_plaque(L, P):
+    # the warehouse plaque (a box on a pallet glowing on a plate) on the front of the belly under the prothorax, tipped
+    # back to the camera: players read the beetle as the loot hauler
+    D.worker_plaque(L, P, loc=(0, -.425, .25), w=.24, h=.15, tilt=32)
 
 
 def mandible_booms(L, P):

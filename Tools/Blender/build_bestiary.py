@@ -9,7 +9,9 @@ by mesh name for that style only: AssetBuilder.BuildStyleModels). --base also wr
 names, wheel/rotor centres, leg joints) — a broken contract is an error, the exit code is 1.
 
 A style is bestiary/styles/<style>.py with `class Style(Lang)` and optionally DESIGNS = {model: function(L)} that
-replace the shared designs for that style.
+replace the shared designs for that style. The danger-zone robots (designs.DANGER) have no shared design (None): they are
+built only for a style that designs them. A part whose original has its origin off the world's (the mimic's lid on
+its hinge) gets that origin.
 """
 import importlib
 import os
@@ -55,6 +57,7 @@ def category(name):
 
 
 _contracts = {}
+_origins = {}   # model -> {part: the original's object origin} where it is not the world origin (the mimic's lid hinge)
 
 
 def contract(name):
@@ -67,6 +70,9 @@ def contract(name):
     out = {}
     for o in set(bpy.data.objects) - before:
         if o.type == "MESH":
+            t = o.matrix_world.to_translation()
+            if t.length > 1e-4:
+                _origins.setdefault(name, {})[o.name.split(".")[0]] = tuple(t)
             ws = [o.matrix_world @ v.co for v in o.data.vertices]
             lo, hi = tuple(min(w[i] for w in ws) for i in range(3)), tuple(max(w[i] for w in ws) for i in range(3))
             key = o.name.split(".")[0]  # Body and Body.001 are one part: their bounds add up (toilet_stall)
@@ -112,6 +118,7 @@ def check_contract(name, objs, report):
         errors += check_lift(have, want, report)
     if name == "robot_worker":
         errors += check_sweep(objs, report)
+    errors += check_anchors(name, objs, want, report)
     for part, (lo, hi) in want.items():
         if part not in have:
             continue
@@ -161,6 +168,78 @@ def check_lift(have, want, report):
         if off > 0.04:
             report(f"  CONTRACT worker_lift.AccentLiftArm: bounds off the original's by {off * 100:.0f} cm")
             errors += 1
+    return errors
+
+
+# The danger-zone robots' points the game depends on beyond part names, wheels and legs (designs.py, the DANGER
+# section): ("near", point, roles, tol) - geometry of those roles passes within tol of the point; ("clear", lo, hi) -
+# nothing inside that box; ("floor", z, tol) - the lowest point of the model; ("bounds", roles, tol) - the union bounds
+# of those roles match the original's.
+def _danger_anchors():
+    A = {name: [("near", eye, ("Eye",), .06)] for name, eye in designs.DANGER_EYES.items()}
+    A["robot_banshee"] = [("near", (sx * .08, -.18, 1.8), ("Eye",), .06) for sx in (-1, 1)] + [("floor", 0.0, .02)]
+    A["robot_gunner"].append(("near", designs.GUNNER_MUZZLE, ("Accent", "Body"), .04))
+    A["robot_gunner"].append(("clear", (-.62, -1.6, .98), (-.38, -1.02, 1.22)))          # the line of fire
+    A["robot_driller"] += [("bounds", ("AccentDrill",), .04)]
+    A["robot_mimic"] += [("bounds", ("Body", "AccentLid"), .03)]
+    A["robot_maniac"].append(("clear",) + designs.MANIAC_CLEAR)
+    A["robot_relay"] = [("floor", 0.0, .02)]
+    return A
+
+
+ANCHORS = _danger_anchors()
+
+
+def check_anchors(name, objs, want, report):
+    checks = ANCHORS.get(name)
+    if not checks:
+        return 0
+    bpy.context.view_layer.update()
+
+    def tree(o):
+        mw = o.matrix_world
+        return BVHTree.FromPolygons([mw @ v.co for v in o.data.vertices], [tuple(p.vertices) for p in o.data.polygons])
+    errors = 0
+    for c in checks:
+        kind = c[0]
+        if kind == "near":
+            _, p, roles, tol = c
+            best = min((tree(o).find_nearest(Vector(p))[3] for o in objs if o.name in roles), default=None)
+            if best is None or best > tol:
+                report(f"  CONTRACT {name}: no {'/'.join(roles)} within {tol * 100:.0f} cm of {p}"
+                       + ("" if best is None else f" (nearest {best * 100:.0f} cm)"))
+                errors += 1
+        elif kind == "clear":
+            lo, hi = Vector(c[1]), Vector(c[2])
+            bm = s.rbox(tuple(hi - lo), tuple((lo + hi) / 2), r=0.0, seg=1)
+            box = BVHTree.FromBMesh(bm)
+            bm.free()
+            hits = [o.name for o in objs if tree(o).overlap(box)
+                    or any(all(lo[k] < (o.matrix_world @ v.co)[k] < hi[k] for k in range(3)) for v in o.data.vertices)]
+            if hits:
+                report(f"  CONTRACT {name}: {hits} inside the box {tuple(lo)}..{tuple(hi)} that must stay clear")
+                errors += 1
+        elif kind == "floor":
+            _, z, tol = c
+            low = min(bounds(o)[0][2] for o in objs)
+            if abs(low - z) > tol:
+                report(f"  CONTRACT {name}: the lowest point at z {low:.3f}, the original's at {z:.3f}")
+                errors += 1
+        elif kind == "bounds":
+            _, roles, tol = c
+            have = [bounds(o) for o in objs if o.name in roles]
+            orig = [want[r] for r in roles if r in want]
+            if not have or not orig:
+                continue
+            lo1 = [min(b[0][k] for b in have) for k in range(3)]
+            hi1 = [max(b[1][k] for b in have) for k in range(3)]
+            lo0 = [min(b[0][k] for b in orig) for k in range(3)]
+            hi0 = [max(b[1][k] for b in orig) for k in range(3)]
+            off = max(max(abs(a - b) for a, b in zip(lo0, lo1)), max(abs(a - b) for a, b in zip(hi0, hi1)))
+            if off > tol:
+                report(f"  CONTRACT {name}: {'+'.join(roles)} bounds {[round(v, 2) for v in lo1]}..{[round(v, 2) for v in hi1]}, "
+                       f"the original's {[round(v, 2) for v in lo0]}..{[round(v, 2) for v in hi0]}")
+                errors += 1
     return errors
 
 
@@ -221,7 +300,7 @@ def load_style(style):
     return mod.Style(), getattr(mod, "DESIGNS", {})
 
 
-MOVING = ("AccentWheel", "AccentRotor", "AccentLidar", "AccentHead", "AccentLeg")
+MOVING = ("AccentWheel", "AccentRotor", "AccentLidar", "AccentHead", "AccentLeg", "AccentLid", "AccentDrill")
 
 
 def fit_roles(name, P):
@@ -268,6 +347,11 @@ def build(name, L, design):
                        world=name in WORLD_GRID)
     objs += fillers(name, objs)
     taller(name, objs)
+    for o in objs:   # the game swaps meshes into the original's objects: a part whose origin is not the world's keeps it
+        origin = _origins.get(name, {}).get(o.name)
+        if origin is not None:
+            o.data.transform(Matrix.Translation(-Vector(origin)))
+            o.matrix_world = Matrix.Translation(Vector(origin)) @ o.matrix_world
     return objs
 
 
@@ -330,7 +414,10 @@ def main():
         for name, design in catalogue.items():
             if (only and name not in only) or name in OPENING or name in LEFT.get(style, ()):
                 continue
-            objs = build(name, L, own.get(name, design))
+            design = own.get(name, design)
+            if design is None:   # a danger-zone robot this style has no design for: the game shows the base model
+                continue
+            objs = build(name, L, design)
             errors += check_contract(name, objs, print)
             path = os.path.join(root, "Styles", "PerStyle", style, f"{name}__{style}.fbx")
             s.export_fbx(path, objs)

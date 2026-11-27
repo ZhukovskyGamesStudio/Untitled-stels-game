@@ -55,6 +55,26 @@ Coordinates: metres, Blender x right, **-y = front**, z up. Roles: `Body` (robot
 | security_camera | Body, Accent, Eye | wall plate at y ≈ +0.27..0.3, lens at y ≈ −0.24 |
 | laser_emitter | Body, Eye | 1.6 m post, 0.12 wide; emitter strip on the −y face, z 0.15..1.55 |
 | attach_eye / attach_mic / attach_seismic / attach_nose | as the shared designs | origin = mount point; keep their size (±0.12, mic 0.39 tall, probe 0.32 tall, nose 0.28 long) |
+| robot_warden | Body, Accent, Eye, AccentWheel0..3 | 1.53 m; wheels r 0.085, w 0.07 at (∓0.22, ∓0.17, 0.085) [0:(−,−) 1:(+,−) 2:(−,+) 3:(+,+)]; lens (0, −0.27, 1.2) |
+| robot_repairman | Body, Accent, Eye, AccentLeg0..3Upper/Lower (build both: the knee is above the hip) | `D.repairman_leg(i)` → hip (±0.25, ∓0.11, 0.27), knee (±0.3, ∓0.16, 0.5) — the Upper's top ~0.55 —, foot on the floor (±0.29, ∓0.2); 0:(−,front) 1:(+,front) 2:(−,back) 3:(+,back); lens (−0.15, −0.22, 0.58) |
+| robot_smoker | Body, Accent, AccentWheel0..3 | no Eye (senses nothing); wheels r 0.1, w 0.07 at (∓0.27, ∓0.2, 0.1); ~1.3 m with the stacks |
+| robot_relay | Body, Accent, Eye | static device, 1.8 m, base r ~0.34 on the floor (z 0); Eye = speakers and lamps |
+| robot_nurse | Body, Accent, Eye, AccentWheel0..2 | casters r 0.05, w 0.04 at (0, −0.17), (−0.15, 0.085), (0.15, 0.085), z 0.05 (under the skirt); lens (0, −0.25, 1.53); ~1.8 m |
+| robot_mimic | Body, BodySocket, Accent, Eye, AccentLid, AccentLeg0..3 (split at 0.25) | the crate's double: Body + AccentLid within 0.8 × 0.6 × 0.6 (±3 cm); AccentLid gets the original's origin, the hinge (0, 0.3, 0.5) (the build sets it); legs at the corners `D.MIMIC_CORNERS` (±0.372, ±0.272), hip 0.462, feet on the floor; eye in the front seam (0, −0.28, 0.49) |
+| robot_salesman | Body, Accent, Eye, AccentWheel0..3 | wheels r 0.09, w 0.07 at (∓0.25, ∓0.2, 0.09); Eye = the screen face around (0, −0.17, 1.33); ~1.85 m |
+| robot_gunner | Body, Accent, Eye, AccentLeg0/1 (split 0.46) | hips (∓0.24, 0, 0.92), feet on the floor; muzzle `D.GUNNER_MUZZLE` (−0.5, −0.99, 1.1) = Unity (0.5, 1.1, 0.99) on Accent/Body, nothing in front of it; lens (0, −0.27, 1.84) |
+| robot_driller | Body, BodyTracks, Accent, AccentDrill, Eye | BodyTracks at x ±0.4 (y −0.4..0.6, 0.42 high); AccentDrill round about the axis x 0, z 0.62 along −y, base y −0.39, tip −0.9, r 0.295 (bounds ±4 cm); lens (0, −0.2, 1.15) |
+| robot_exterminator | Body, BodyBands, BodyBooms, Accent, Eye, AccentWheel0..3 | wheels r 0.14, w 0.1 at (∓0.36, ∓0.24, 0.14); lens (0, −0.25, 1.04) |
+| robot_banshee | Body, Accent, Eye | no wheels or legs: it hovers 0.3 m up, the bottom of the hover skirt at z 0 (±2 cm); ~2.0 m; Eye in the throats of the two forward horns (±0.08, −0.18, 1.8) |
+| robot_maniac | Body, Accent, Eye, AccentLeg0/1 (split 0.52) | hips (∓0.15, 0.02, 1.04), feet on the floor; lens (0, −0.37, 1.735); the back cradle holds a player across it at (0, 0.15, 1.72): the box `D.MANIAC_CLEAR` (±0.2, 0.07..0.22, 1.73..1.86) stays empty |
+
+The twelve danger-zone robots (`D.DANGER`, their base models are `Tools/Blender/danger_bots_a/b/c.py`) have no shared
+design: `designs.DESIGNS` maps them to `None`, so a style builds one only when its file adds `DESIGNS["robot_warden"] = fn`
+(the constants and leg helpers are in the DANGER section of `designs.py`). Without one the game shows the base model.
+`build_bestiary.ANCHORS` checks their lenses, the muzzle and its line of fire, the drill, the crate box, the floor and the
+cradle. The cocoon, net and goo puddle are effects, not styled.
+S06_Storybook designs all twelve (concepts `Logs/comfy/danger_s06`); the worker carries the warehouse plaque
+(`D.worker_plaque`: a box-on-pallet pictogram glowing on a plate at the front of the deck) in the base model and in S06.
 
 Parts the original does not have (Accent on the spider/hound/listener/drone) are folded into Body automatically;
 moving parts (wheels, rotors, lidar, heads, legs) are never moved by the mesh fixer — connect them yourself (axles,

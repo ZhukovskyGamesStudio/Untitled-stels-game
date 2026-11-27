@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds one or more styles into <root> and renders lineups to look at (review.py, front and 3/4 view of each model).
 #   Tools/Blender/bestiary/review_style.sh <root> <style>[,<style>...] [model,model...] [robots|props|all]
-# Writes <root>/<style>_robots.png (12 robots), <root>/<style>_devices.png (devices and sensor modules) and, for props,
+# Writes <root>/<style>_robots.png (12 robots), <root>/<style>_danger.png (the danger-zone robots the style has designs
+# for), <root>/<style>_devices.png (devices and sensor modules) and, for props,
 # <root>/<style>_props.png (furniture and level pieces).
 set -e
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,15 +11,17 @@ ROOT="$1"; STYLES="$2"; ONLY="${3:+--only $3}"; SET="${4:-robots}"
 "$B" -b --factory-startup --python "$HERE/build_bestiary.py" -- "$ROOT" --styles "$STYLES" $ONLY --set "$SET" 2>&1 \
   | grep -E "CONTRACT|floats|DONE|Error|Traceback|line [0-9]|MESHFIX .*: [1-9][0-9]* pieces attached" || true
 ROBOTS="robot_guard robot_hunter robot_hound robot_sorter robot_listener robot_worker robot_thumper robot_sweeper robot_drone robot_spider robot_turret robot_vacuum"
+DANGER="robot_warden robot_repairman robot_smoker robot_relay robot_nurse robot_mimic robot_salesman robot_gunner robot_driller robot_exterminator robot_banshee robot_maniac"
 DEVICES="sensor_lidar sensor_pir sensor_plate security_camera laser_emitter attach_eye attach_mic attach_seismic attach_nose"
-SETS="robots devices"
+SETS="robots danger devices"
 [ "$SET" = props ] && SETS="props"
-[ "$SET" = all ] && SETS="robots devices props"
+[ "$SET" = all ] && SETS="robots danger devices props"
 for S in ${STYLES//,/ }; do
   D="$ROOT/Styles/PerStyle/$S"
   for set in $SETS; do
     case $set in
       robots) list=$ROBOTS ;;
+      danger) list=$DANGER ;;
       devices) list=$DEVICES ;;
       props) list=$(ls "$D" | sed -n "s/__$S\.fbx\$//p" | grep -v -E "^(robot_|sensor_|attach_|security_camera|laser_emitter)") ;;
     esac
