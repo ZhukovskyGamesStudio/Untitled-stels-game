@@ -98,7 +98,7 @@ namespace Stealth.Player
             new(GameAction.Cheats, "other", KeyBinding.Of(Key.F4)),
             new(GameAction.Gadget, "actions", KeyBinding.Of(Key.X)),
             new(GameAction.Horn, "car", KeyBinding.Of(Key.H)),
-            new(GameAction.UseHand, "actions", KeyBinding.Of(Key.V)),
+            new(GameAction.UseHand, "actions", KeyBinding.Of(Key.R)),
             new(GameAction.BotCall, "team", KeyBinding.Of(Key.B)),
             new(GameAction.BotExit, "team", KeyBinding.Of(Key.N)),
             new(GameAction.CallHelp, "team", KeyBinding.Of(Key.Z)),
@@ -139,7 +139,10 @@ namespace Stealth.Player
             return f.Length == 1 && l.Length == 1 && b.Length == 1 && r.Length == 1 ? f + l + b + r : $"{f}/{l}/{b}/{r}";
         }
 
-        /// <summary>Other actions on the same key. Some share it on purpose (R rotates in the backpack and restarts a failed run).</summary>
+        /// <summary>
+        /// Other actions on the same key. Some share it on purpose: R rotates a dragged thing in the backpack (hands out), uses
+        /// the thing in the hand (hands in, on one's feet) and restarts a failed run — never two at once.
+        /// </summary>
         public static bool Conflicts(GameAction a, out GameAction other)
         {
             var b = Get(a);
@@ -153,8 +156,9 @@ namespace Stealth.Player
             return false;
         }
 
-        static bool SharedOnPurpose(GameAction a, GameAction b) =>
-            (a == GameAction.Rotate && b == GameAction.Restart) || (a == GameAction.Restart && b == GameAction.Rotate);
+        static bool SharedOnPurpose(GameAction a, GameAction b) => a != b && OnR(a) && OnR(b);
+
+        static bool OnR(GameAction a) => a is GameAction.Rotate or GameAction.Restart or GameAction.UseHand;
 
         public static void Load()
         {

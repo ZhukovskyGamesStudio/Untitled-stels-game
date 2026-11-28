@@ -51,6 +51,7 @@ namespace Stealth.UI
         void AwakeBench()
         {
             if (QuestionIcon != null) s_Question = QuestionIcon;
+            if (HighlightPrefab != null) s_Sticker = HighlightPrefab.sprite;
             if (BenchItems == null) return;
             m_BenchItems = new UiPool<InventoryBlockView>(BlockPrefab, BenchItems);
             m_BenchIcons = new UiPool<Image>(HighlightPrefab, BenchItems);
@@ -211,7 +212,8 @@ namespace Stealth.UI
 
         /// <summary>
         /// A blueprint in a grid: over its sheet, the pictures of the things its recipe takes and, last, the thing it makes —
-        /// a «?» until the team has made it this run. Laid out row by row in the blueprint's cells as they lie (turned or not).
+        /// a «?» until the team has made it this run — on a yellow sticker in the bottom right place, so it is not taken for one
+        /// of the things; all of them as big as fits the sheet as it lies, turned or not (<see cref="BlueprintLayout"/>).
         /// </summary>
         static void DrawBlueprint(UiPool<Image> icons, Vector2Int origin, int recipe, Vector2Int turned, float alpha)
         {
@@ -219,35 +221,41 @@ namespace Stealth.UI
             var book = gm != null ? gm.Book : CraftBook.Current;
             var r = book.Get(recipe);
             if (r == null) return;
-            const float size = 22f, gap = 2f;
-            float w = turned.x * Cell - 8f, h = turned.y * Cell - 8f;
-            int perRow = Mathf.Max(1, Mathf.FloorToInt((w + gap) / (size + gap)));
+            const float gap = 3f, inset = 5f, sticker = 3f;
+            float w = turned.x * Cell - 2f * inset, h = turned.y * Cell - 2f * inset;
             int n = r.Ingredients.Length + 1;
-            int rows = Mathf.CeilToInt(n / (float)perRow);
-            float y0 = (h - rows * size - (rows - 1) * gap) / 2f;
+            var (columns, rows, size) = BlueprintLayout.Fit(n, w - 2f * sticker, h - 2f * sticker, gap + sticker, 26f);
+            float x0 = (w - columns * size - (columns - 1) * gap) / 2f, y0 = (h - rows * size - (rows - 1) * gap) / 2f;
             for (int i = 0; i < n; i++)
             {
                 bool result = i == n - 1;
                 bool known = result && gm != null && BenchRules.IsKnown(gm.KnownRecipes, recipe);
                 var sprite = !result ? IconOf(r.Ingredients[i]) : known ? IconOf(r.Result) : s_Question;
-                if (sprite == null) continue;
-                int row = i / perRow, col = i % perRow;
-                int inRow = Mathf.Min(perRow, n - row * perRow);
-                float x0 = (w - inRow * size - (inRow - 1) * gap) / 2f;
-                var img = icons.Next();
-                var rt = img.rectTransform;
-                img.sprite = sprite;
-                img.type = Image.Type.Simple;
-                img.preserveAspect = true;
-                img.raycastTarget = false;
-                img.color = new Color(1f, 1f, 1f, alpha);
-                rt.pivot = new Vector2(0f, 1f);
-                rt.localScale = Vector3.one;
-                rt.localRotation = Quaternion.identity;
-                rt.sizeDelta = new Vector2(size, size);
-                rt.anchoredPosition = new Vector2(origin.x * Cell + 4f + x0 + col * (size + gap), -(origin.y * Cell + 4f + y0 + row * (size + gap)));
-                rt.SetAsLastSibling();
+                var place = BlueprintLayout.Place(i, n, columns, rows);
+                var at = new Vector2(origin.x * Cell + inset + x0 + place.x * (size + gap), -(origin.y * Cell + inset + y0 + place.y * (size + gap)));
+                if (result) Picture(icons, s_Sticker, at - new Vector2(sticker, -sticker), size + 2f * sticker, UiPalette.NoteYellow.A(alpha), Image.Type.Sliced);
+                if (sprite != null) Picture(icons, sprite, at, size, new Color(1f, 1f, 1f, alpha), Image.Type.Simple);
             }
+        }
+
+        /// <summary>The sticker under the thing a blueprint makes (the cell highlight's sprite).</summary>
+        static Sprite s_Sticker;
+
+        static void Picture(UiPool<Image> icons, Sprite sprite, Vector2 topLeft, float size, Color color, Image.Type type)
+        {
+            var img = icons.Next();
+            var rt = img.rectTransform;
+            img.sprite = sprite;
+            img.type = sprite != null ? type : Image.Type.Simple;
+            img.preserveAspect = type == Image.Type.Simple;
+            img.raycastTarget = false;
+            img.color = color;
+            rt.pivot = new Vector2(0f, 1f);
+            rt.localScale = Vector3.one;
+            rt.localRotation = Quaternion.identity;
+            rt.sizeDelta = new Vector2(size, size);
+            rt.anchoredPosition = topLeft;
+            rt.SetAsLastSibling();
         }
     }
 }

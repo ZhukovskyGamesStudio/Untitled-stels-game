@@ -683,7 +683,7 @@ namespace Stealth.UI
                 if (m_HandColor.a <= 0f) m_HandColor = new Color(back.r, back.g, back.b, 1f);
                 var tint = !overHand ? m_HandColor : HandTakes(inv) ? UiPalette.Good : UiPalette.Stamp;
                 HandBackground.color = new Color(tint.r, tint.g, tint.b, back.a);
-                SetIfChanged(HandLabel, $"{Loc.T("inventory.hand")} [{Controls.Label(GameAction.UseHand)}]");
+                SetIfChanged(HandLabel, Loc.T("inventory.hand")); // (its key is a hint of the stack, while there is something to use)
             }
 
             bool board = Board != null && Board.Visible && m_StashItems != null;
@@ -749,11 +749,27 @@ namespace Stealth.UI
             if (tip == null && Time.time < m_FullChargeUntil) tip = Loc.T("inventory.full_charge");
             Ui.Show(Tooltip, tip != null);
             if (tip == null) return;
-            Tooltip.text = tip;
-            // Without a cursor the note sits under the crosshair.
+            var rt = Tooltip.rectTransform;
+            if (Tooltip.text != tip)
+            {
+                // the note as wide as its words up to TooltipWidth, then as many lines tall as they take (its slip follows: UiBacking)
+                Tooltip.text = tip;
+                rt.sizeDelta = new Vector2(TooltipWidth, TooltipLine);
+                float width = Mathf.Min(TooltipWidth, Mathf.Ceil(Tooltip.preferredWidth) + 2f);
+                rt.sizeDelta = new Vector2(width, TooltipLine);
+                rt.sizeDelta = new Vector2(width, Mathf.Max(TooltipLine, Mathf.Ceil(Tooltip.preferredHeight) + 2f));
+            }
+            // Without a cursor the note sits under the crosshair; near the screen's right or bottom edge it goes the other way.
             var at = me.CursorMode ? MouseCanvas : Canvas.rect.size / 2f;
-            Tooltip.rectTransform.anchoredPosition = at + new Vector2(16f, -8f);
+            var pos = at + new Vector2(16f, -8f);
+            var note = rt.sizeDelta;
+            if (pos.x + note.x + 10f > Canvas.rect.width) pos.x = at.x - 16f - note.x;
+            if (pos.y - note.y - 6f < 0f) pos.y = note.y + 6f;
+            rt.anchoredPosition = pos;
         }
+
+        /// <summary>The widest a tooltip note gets before its words wrap, and the height of one of its lines (canvas units).</summary>
+        const float TooltipWidth = 420f, TooltipLine = 22f;
 
         void DrawStashItems()
         {

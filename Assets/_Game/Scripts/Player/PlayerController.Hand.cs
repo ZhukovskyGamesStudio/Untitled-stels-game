@@ -36,6 +36,7 @@ namespace Stealth.Player
         void UpdateHand()
         {
             if (!Controls.Pressed(GameAction.UseHand) || CursorMode || Downed) return;
+            if (GameManager.Instance != null && GameManager.Instance.Phase == RunPhase.Failed) return; // (the same key restarts the run)
             // the tablet opens and closes its map on this peer only
             var inv = GetComponent<PlayerInventory>();
             if (inv != null && inv.Holds(Items.ItemCatalog.Tablet)) { TabletOpen = !TabletOpen; return; }

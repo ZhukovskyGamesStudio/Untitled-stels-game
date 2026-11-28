@@ -344,5 +344,35 @@ namespace Stealth.Tests
             Assert.IsTrue(ObjectiveRules.Step(h).Value.done);
             Assert.IsNull(ObjectiveRules.Step(default), "no job, no line");
         }
+
+        [Test]
+        public void ABlueprintShowsEveryThingAndItsResultApart()
+        {
+            // a 3 x 2 blueprint (cells of 32): four things and the result, all on the sheet
+            float w = 3 * 32f - 16f, h = 2 * 32f - 16f;
+            for (int things = 1; things <= 6; things++)
+            {
+                int n = things + 1;
+                var (columns, rows, size) = BlueprintLayout.Fit(n, w, h, 3f, 26f);
+                Assert.GreaterOrEqual(columns * rows, n, "a place for each");
+                Assert.LessOrEqual(columns * size + (columns - 1) * 3f, w + 1e-3f, $"{things} things: across the sheet");
+                Assert.LessOrEqual(rows * size + (rows - 1) * 3f, h + 1e-3f, $"{things} things: down the sheet");
+                Assert.Greater(size, 8f, "big enough to tell");
+                var places = new System.Collections.Generic.HashSet<Vector2Int>();
+                for (int i = 0; i < n; i++) Assert.IsTrue(places.Add(BlueprintLayout.Place(i, n, columns, rows)), "no two in one place");
+                Assert.AreEqual(new Vector2Int(columns - 1, rows - 1), BlueprintLayout.Place(n - 1, n, columns, rows), "the result: bottom right");
+            }
+            // the sheet turned upright: the same things, the grid turned
+            var (c2, r2, _) = BlueprintLayout.Fit(5, h, w, 3f, 26f);
+            Assert.GreaterOrEqual(r2, c2);
+        }
+
+        [Test]
+        public void TheHandKeyIsRSharedOnlyWithRotateAndRestart()
+        {
+            Controls.ResetToDefaults();
+            Assert.AreEqual(Controls.Get(GameAction.Rotate), Controls.Get(GameAction.UseHand), "R");
+            Assert.IsFalse(Controls.Conflicts(GameAction.UseHand, out var other), $"no clash (but {other})");
+        }
     }
 }
